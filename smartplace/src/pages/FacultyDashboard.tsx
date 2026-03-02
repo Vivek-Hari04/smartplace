@@ -41,17 +41,24 @@ export default function FacultyDashboard({
     const initialize = async () => {
       try {
         const coursesRes = await api.get("/faculty/courses");
-        setCourses(coursesRes.data);
+        // Ensure data is an array before setting state
+        if (Array.isArray(coursesRes.data)) {
+          setCourses(coursesRes.data);
+        } else {
+          console.error("Courses data is not an array:", coursesRes.data);
+          setCourses([]);
+        }
 
         try {
-          await api.get("/advisor/students");
-          setIsAdvisor(true);
+          const advisorRes = await api.get("/advisor/students");
+          setIsAdvisor(Array.isArray(advisorRes.data));
         } catch {
           setIsAdvisor(false);
         }
 
       } catch (err) {
         console.error("Initialization failed", err);
+        setCourses([]);
       } finally {
         setLoading(false);
       }

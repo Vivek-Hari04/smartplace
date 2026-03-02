@@ -1,0 +1,36 @@
+  1. Frontend (React/Vite)
+  The frontend interacts directly with Supabase Auth for authentication, bypassing the custom backend for the initial login/signup flow.
+
+
+   * Registration (`Auth.tsx`):
+       * When a user signs up, the frontend calls supabase.auth.signUp().
+       * The user's role (e.g., student, faculty) is passed as metadata during signup.
+       * The component also attempts to create a record in a profiles table to store this role for future queries.
+   * Login (`Auth.tsx`):
+       * The user logs in via supabase.auth.signInWithPassword().
+       * Upon success, Supabase returns a JWT (JSON Web Token) which is stored in the browser.
+   * Session & Role Management (`App.tsx`):
+       * The app listens for authentication state changes using onAuthStateChange.
+       * Once logged in, it fetches the user's role from the database (querying the users table).
+       * Role-Based Routing: It conditionally renders different dashboards (StudentDashboard, FacultyDashboard, etc.) based on the retrieved role.
+
+
+  2. Backend (Node.js/Express)
+  The backend serves as a Resource Server. It does not handle login logic but protects its API endpoints by validating the tokens issued by Supabase.
+
+
+   * Authentication Middleware (`server/index.js`):
+       * All routes under /api are protected by the authenticateUser middleware.
+       * The middleware extracts the Bearer Token from the Authorization header.
+       * It uses the backend Supabase client to call supabase.auth.getUser(token). This verifies with Supabase that the token is valid and hasn't expired.
+   * Data Access:
+       * If the token is valid, the request proceeds, and the backend can perform database operations using a PostgreSQL pool (pg).
+       * If invalid, it returns a 401 Unauthorized error.
+
+
+  Summary of the Flow
+   1. User → Enters credentials in the Frontend.
+   2. Frontend → Sends credentials to Supabase Auth.
+   3. Supabase → Returns a JWT to the Frontend.
+   4. Frontend → Includes the JWT in the header of requests sent to the Backend.
+   5. Backend → Validates the JWT with Supabase before returning protected data.

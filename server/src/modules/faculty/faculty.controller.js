@@ -2,9 +2,7 @@
 
 const facultyService = require("./faculty.service");
 
-/* =========================
-   COURSE MANAGEMENT
-========================= */
+/*COURSE MANAGEMENT*/
 
 exports.createCourse = async (req, res, next) => {
   try {
@@ -70,9 +68,7 @@ exports.deleteCourse = async (req, res, next) => {
   }
 };
 
-/* =========================
-   ENROLLMENTS
-========================= */
+/*ENROLLMENTS*/
 
 exports.getEnrolledStudents = async (req, res, next) => {
   try {
@@ -86,13 +82,8 @@ exports.getEnrolledStudents = async (req, res, next) => {
   }
 };
 
-/* =========================
-   MATERIALS
-========================= */
 
-/* =========================
-   MATERIALS
-========================= */
+/*MATERIALS*/
 
 exports.uploadMaterial = async (req, res, next) => {
   try {
@@ -141,9 +132,7 @@ exports.deleteMaterial = async (req, res, next) => {
   }
 };
 
-/* =========================
-   DOUBTS
-========================= */
+/*DOUBTS*/
 
 exports.getDoubts = async (req, res, next) => {
   try {
@@ -191,9 +180,7 @@ exports.reopenDoubt = async (req, res, next) => {
   }
 };
 
-/* =========================
-   ASSESSMENTS
-========================= */
+/*ASSESSMENTS*/
 
 exports.createAssessment = async (req, res, next) => {
   try {

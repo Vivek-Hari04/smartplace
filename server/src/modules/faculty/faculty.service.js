@@ -1,8 +1,6 @@
 const pool = require("../../config/db");
 
-/* =========================
-   COURSE MANAGEMENT
-========================= */
+/*COURSE MANAGEMENT*/
 
 exports.createCourse = async (facultyId, { name, description }) => {
   const result = await pool.query(
@@ -88,9 +86,7 @@ exports.deleteCourse = async (facultyId, courseId) => {
   }
 };
 
-/* =========================
-   ENROLLMENTS
-========================= */
+/*ENROLLMENTS*/
 
 exports.getEnrolledStudents = async (facultyId, courseId) => {
   const result = await pool.query(
@@ -106,9 +102,7 @@ exports.getEnrolledStudents = async (facultyId, courseId) => {
   return result.rows;
 };
 
-/* =========================
-   MATERIALS (Drive Link Based)
-========================= */
+/*MATERIALS (Drive Link Based)*/
 
 exports.uploadMaterial = async (facultyId, courseId, data) => {
   const { title, description, file_url } = data;
@@ -204,9 +198,7 @@ exports.deleteMaterial = async (facultyId, materialId) => {
   }
 };
 
-/* =========================
-   DOUBTS
-========================= */
+/*DOUBTS*/
 
 exports.getDoubts = async (facultyId) => {
   const result = await pool.query(
@@ -250,9 +242,7 @@ exports.respondToDoubt = async (facultyId, doubtId, response) => {
   return { message: "Response submitted" };
 };
 
-/* =========================
-   ASSESSMENTS
-========================= */
+/*ASSESSMENTS*/
 
 exports.createAssessment = async (facultyId, courseId, data) => {
   const check = await pool.query(

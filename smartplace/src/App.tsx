@@ -13,7 +13,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
 
-  /* ================= INITIAL SESSION CHECK ================= */
+  /*INITIAL SESSION CHECK*/
 
   useEffect(() => {
     const initialize = async () => {
@@ -30,7 +30,7 @@ function App() {
 
     initialize();
 
-    /* ================= LISTEN FOR AUTH CHANGES ================= */
+    /*LISTEN FOR AUTH CHANGES*/
 
     const { data: { subscription } } =
       supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -47,7 +47,7 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  /* ================= FETCH USER ROLE ================= */
+  /* FETCH USER ROLE*/
 
   const fetchRole = async (userId: string) => {
     try {
@@ -74,7 +74,7 @@ function App() {
     }
   };
 
-  /* ================= LOADING SCREEN ================= */
+  /* LOADING SCREEN*/
 
   if (loading) {
     return (
@@ -84,14 +84,14 @@ function App() {
     );
   }
 
-  /* ================= NOT LOGGED IN ================= */
+  /* NOT LOGGED IN*/
 
   if (!session) {
     if (showAuth) return <Auth onBack={() => setShowAuth(false)} />;
     return <HomePage onEnter={() => setShowAuth(true)} />;
   }
 
-  /* ================= ROLE-BASED ROUTING ================= */
+  /* ROLE-BASED ROUTING*/
 
   const renderPage = () => {
     switch (role) {

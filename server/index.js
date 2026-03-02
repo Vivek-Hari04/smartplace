@@ -4,38 +4,29 @@ const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
 
-/* =========================
-   IMPORT BACKEND MODULES
-========================= */
+/*IMPORT BACKEND MODULES*/
 
 const router = require("./src/routes/router");
 const errorMiddleware = require("./src/middleware/error.middleware");
-const pool = require("./src/config/db"); // ✅ Shared DB pool
+const pool = require("./src/config/db"); // Shared DB pool instance
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-/* =========================
-   GLOBAL MIDDLEWARE
-========================= */
+/*GLOBAL MIDDLEWARE*/
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-/* =========================
-   SUPABASE CLIENT
-   (Used for token validation)
-========================= */
+/*SUPABASE CLIENT(Used for token validation)*/
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
 
-/* =========================
-   AUTHENTICATION MIDDLEWARE
-========================= */
+/*AUTHENTICATION MIDDLEWARE*/
 
 const authenticateUser = async (req, res, next) => {
   try {
@@ -64,9 +55,7 @@ const authenticateUser = async (req, res, next) => {
   }
 };
 
-/* =========================
-   HEALTH CHECK (Public)
-========================= */
+/*HEALTH CHECK (Public)*/
 
 app.get("/", async (req, res) => {
   try {
@@ -81,9 +70,7 @@ app.get("/", async (req, res) => {
   }
 });
 
-/* =========================
-   PROTECTED TEST ROUTES
-========================= */
+/*PROTECTED TEST ROUTES*/
 
 app.get("/db", authenticateUser, async (req, res) => {
   try {
@@ -107,21 +94,15 @@ app.get("/student_list", authenticateUser, async (req, res) => {
   }
 });
 
-/* =========================
-   PROTECT ALL MAIN API ROUTES
-========================= */
+/*PROTECT ALL MAIN API ROUTES*/
 
 app.use("/api", authenticateUser, router);
 
-/* =========================
-   GLOBAL ERROR HANDLER
-========================= */
+/*GLOBAL ERROR HANDLER */
 
 app.use(errorMiddleware);
 
-/* =========================
-   SERVER START
-========================= */
+/*SERVER START*/
 
 app.listen(port, () => {
   console.log(`Backend listening at http://localhost:${port}`);

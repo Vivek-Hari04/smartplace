@@ -1,0 +1,71 @@
+const adminService = require("./admin.service");
+
+/* USERS */
+
+exports.getAllUsers = async (req, res, next) => {
+  try {
+    const users = await adminService.getAllUsers();
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getPendingStudents = async (req, res, next) => {
+  try {
+    const students = await adminService.getPendingStudents();
+    res.json(students);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.verifyStudent = async (req, res, next) => {
+  try {
+    const student = await adminService.verifyStudent(req.params.id);
+    res.json({ message: "Student verified successfully", student });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.assignAdvisor = async (req, res, next) => {
+  try {
+    const { studentId, advisorId } = req.body;
+    const student = await adminService.assignAdvisor(studentId, advisorId);
+    res.json({ message: "Advisor assigned successfully", student });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* SYSTEM STATS */
+
+exports.getStats = async (req, res, next) => {
+  try {
+    const stats = await adminService.getStats();
+    res.json(stats);
+  } catch (err) {
+    next(err);
+  }
+};
+
+/* SYSTEM DATA */
+
+exports.getAllCourses = async (req, res, next) => {
+  try {
+    const courses = await adminService.getAllCourses();
+    res.json(courses);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getFacultyList = async (req, res, next) => {
+  try {
+    const faculty = await adminService.getFacultyList();
+    res.json(faculty);
+  } catch (err) {
+    next(err);
+  }
+};

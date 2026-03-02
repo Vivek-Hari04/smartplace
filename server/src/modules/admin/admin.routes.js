@@ -1,0 +1,23 @@
+const express = require("express");
+const router = express.Router();
+
+const authMiddleware = require("../../middleware/auth.middleware");
+const roleMiddleware = require("../../middleware/role.middleware");
+const adminController = require("./admin.controller");
+
+// All admin routes require admin role
+router.use(authMiddleware);
+router.use(roleMiddleware("admin"));
+
+/* USER MANAGEMENT */
+router.get("/users", adminController.getAllUsers);
+router.get("/students/pending", adminController.getPendingStudents);
+router.patch("/students/:id/verify", adminController.verifyStudent);
+router.post("/students/assign-advisor", adminController.assignAdvisor);
+
+/* SYSTEM OVERSIGHT */
+router.get("/stats", adminController.getStats);
+router.get("/courses", adminController.getAllCourses);
+router.get("/faculty", adminController.getFacultyList);
+
+module.exports = router;

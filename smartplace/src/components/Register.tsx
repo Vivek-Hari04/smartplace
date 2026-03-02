@@ -17,41 +17,73 @@ export default function Register({ onSwitchToLogin }: RegisterProps) {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    // Sign up the user
-    const { data, error } = await supabase.auth.signUp({ 
-      email, 
-      password,
-      options: {
-        data: {
-          role: role,
-          fname: fname,
-          lname: lname
-        }
-      }
-    });
-    
-    if (error) {
-      alert(error.message);
-    } else if (data.user) {
-      // Create or update a user record
-      // We use upsert in case a DB trigger already created the record
-      const { error: profileError } = await supabase
+
+    try {
+      // 1. Proactive Guardrail: Check if the email already exists in our public.users table
+      const { data: existingUser, error: checkError } = await supabase
         .from('users')
-        .upsert([{ 
-          user_id: data.user.id, 
-          role: role,
-          fname: fname,
-          lname: lname
-        }]);
-      
-      if (profileError) {
-        console.warn('Error syncing user details:', profileError.message);
+        .select('user_id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('Error checking existing user:', checkError.message);
       }
-      alert('Check your email for the confirmation link!');
-      onSwitchToLogin();
+
+      if (existingUser) {
+        alert('This email is already registered. Please login to your account.');
+        onSwitchToLogin();
+        setLoading(false);
+        return;
+      }
+      
+      // 2. Sign up the user
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          data: {
+            role: role,
+            fname: fname,
+            lname: lname
+          }
+        }
+      });
+      
+      if (error) {
+        alert(error.message);
+      } else if (data.user) {
+        // 3. Secondary Guardrail: Check identities
+        // Supabase returns an empty identities array if the email is already taken (with confirmations enabled)
+        if (data.user.identities && data.user.identities.length === 0) {
+          alert('This email is already registered. Please login to your account.');
+          onSwitchToLogin();
+          setLoading(false);
+          return;
+        }
+
+        // Create or update a user record
+        const { error: profileError } = await supabase
+          .from('users')
+          .upsert([{ 
+            user_id: data.user.id, 
+            email: email, // Include email in the record
+            role: role,
+            fname: fname,
+            lname: lname
+          }]);
+        
+        if (profileError) {
+          console.warn('Error syncing user details:', profileError.message);
+        }
+        alert('Check your email for the confirmation link!');
+        onSwitchToLogin();
+      }
+    } catch (err: any) {
+      alert('An unexpected error occurred: ' + err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (

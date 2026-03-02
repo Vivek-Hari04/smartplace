@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
 import HomePage from "./pages/HomePage";
@@ -12,89 +12,105 @@ function App() {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
+  
+  // Track the last processed user ID to prevent redundant fetches
+  const lastFetchedUserId = useRef<string | null>(null);
 
   /* ================= FETCH USER ROLE ================= */
 
-  const fetchRole = useCallback(async (userId: string) => {
+  // Removed 'role' from dependencies to prevent the loop
+  const fetchRole = useCallback(async (userId: string, currentSession: any) => {
+    // If we already have a role for this user, we can skip re-fetching 
+    // BUT we should still set loading to false.
+    if (lastFetchedUserId.current === userId && lastFetchedUserId.current !== null) {
+      setLoading(false);
+      return;
+    }
+    
     console.log("Fetching role for user:", userId);
+    lastFetchedUserId.current = userId;
+
+    // 1. Check Metadata first (available immediately)
+    const metadataRole = currentSession.user?.user_metadata?.role;
+    if (metadataRole) {
+      console.log("Using role from metadata:", metadataRole);
+      setRole(metadataRole);
+      setLoading(false); 
+      // We continue to sync with DB in background
+    }
+
     try {
-      // Adding a local timeout for the DB query specifically
-      const promise = supabase
+      const { data, error } = await supabase
         .from("users")
         .select("role")
         .eq("user_id", userId)
         .single();
-      
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Database query timed out")), 10000)
-      );
 
-      const { data, error }: any = await Promise.race([promise, timeoutPromise]);
-
-      if (error) {
-        console.warn("Error fetching role, defaulting to student:", error.message);
-        setRole("student");
-      } else {
-        console.log("Role fetched successfully:", data?.role);
-        setRole(data?.role || "student");
+      if (!error && data?.role) {
+        console.log("Synced role from DB:", data.role);
+        setRole(data.role);
+      } else if (error) {
+        console.warn("DB role fetch skipped/failed:", error.message);
+        // Fallback if metadata was also missing
+        if (!metadataRole) setRole("student");
       }
     } catch (err: any) {
-      console.error("Role fetch failed or timed out:", err.message);
-      setRole("student");
+      console.error("Role fetch exception:", err.message);
+      if (!metadataRole) setRole("student");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // Stable dependency array
 
   /* ================= AUTH INITIALIZATION ================= */
 
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout: If everything hangs, just stop loading after 6 seconds
+    // Safety timeout to prevent infinite loading
     const safetyTimeout = setTimeout(() => {
       if (mounted && loading) {
-        console.warn("Global Auth safety timeout triggered");
+        console.warn("Auth safety timeout reached");
         setLoading(false);
       }
-    }, 6000);
+    }, 5000);
 
-    const checkSession = async () => {
-      console.log("Checking initial session...");
+    const initializeAuth = async () => {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
+        // 1. Explicitly check for an existing session first
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (mounted) {
-          console.log("Initial session status:", !!session);
-          setSession(session);
-          if (session) {
-            await fetchRole(session.user.id);
+          if (initialSession) {
+            setSession(initialSession);
+            await fetchRole(initialSession.user.id, initialSession);
           } else {
             setLoading(false);
           }
         }
       } catch (err) {
-        console.error("Session check failed:", err);
+        console.error("Initial session check failed:", err);
         if (mounted) setLoading(false);
       }
     };
 
-    checkSession();
+    initializeAuth();
 
-    /* ================= LISTEN FOR AUTH CHANGES ================= */
+    // 2. Listen for future changes
     const { data: { subscription } } =
       supabase.auth.onAuthStateChange(async (event, newSession) => {
         if (!mounted) return;
         
-        console.log("Auth event fired:", event, "Session exists:", !!newSession);
+        console.log(`Auth Event: ${event}`);
         
-        setSession(newSession);
-        if (newSession) {
-          await fetchRole(newSession.user.id);
-        } else {
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
           setRole(null);
+          lastFetchedUserId.current = null;
           setLoading(false);
+        } else if (newSession) {
+          setSession(newSession);
+          fetchRole(newSession.user.id, newSession);
         }
       });
 
@@ -103,7 +119,7 @@ function App() {
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [fetchRole]);
+  }, [fetchRole]); // fetchRole is now stable
 
   /* ================= RENDER LOGIC ================= */
 

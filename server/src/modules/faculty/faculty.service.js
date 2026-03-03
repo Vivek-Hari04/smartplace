@@ -87,10 +87,14 @@ exports.deleteCourse = async (facultyId, courseId) => {
 };
 
 /*ENROLLMENTS*/
-
 exports.getEnrolledStudents = async (facultyId, courseId) => {
   const result = await pool.query(
-    `SELECT s.*, u.fname, u.lname, e.attendance
+    `SELECT 
+        s.user_id,
+        u.fname,
+        u.lname,
+        u.email,
+        e.attendance
      FROM enrollments e
      JOIN students s ON s.user_id = e.student_id
      JOIN users u ON u.user_id = s.user_id

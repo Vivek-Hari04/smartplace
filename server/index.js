@@ -104,8 +104,20 @@ app.use(errorMiddleware);
 
 /*SERVER START*/
 
-app.listen(port, () => {
-  console.log(`Backend listening at http://localhost:${port}`);
-});
+const startServer = async () => {
+  try {
+    await pool.query("SELECT 1");
+    console.log("Database connected successfully.");
+
+    app.listen(port, () => {
+      console.log(`Backend listening at http://localhost:${port}`);
+    });
+  } catch (err) {
+    console.error("Failed to connect to database on startup:", err);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 module.exports = app;

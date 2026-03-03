@@ -89,32 +89,85 @@ export default function FacultyDashboard({
     });
   }, [accessToken]);
 
-  /* ================= INITIAL LOAD ================= */
-  useEffect(() => {
-    const initialize = async () => {
-      try {
-        const coursesRes = await api.get("/faculty/courses");
-        if (Array.isArray(coursesRes.data)) {
-          setCourses(coursesRes.data);
-        }
-
-        try {
-          const advisorRes = await api.get("/advisor/students");
-          setIsAdvisor(Array.isArray(advisorRes.data));
-        } catch {
-          setIsAdvisor(false);
-        }
-      } catch (err) {
-        console.error("Initialization failed", err);
-      } finally {
-        setLoading(false);
+ /* ================= INITIAL LOAD ================= */
+useEffect(() => {
+  const initialize = async () => {
+    try {
+      const coursesRes = await api.get("/faculty/courses");
+      if (Array.isArray(coursesRes.data)) {
+        setCourses(coursesRes.data);
       }
-    };
 
-    initialize();
-  }, [api]);
+      try {
+        const advisorRes = await api.get("/advisor/students");
+        setIsAdvisor(Array.isArray(advisorRes.data));
+      } catch {
+        setIsAdvisor(false);
+      }
+    } catch (err) {
+      console.error("Initialization failed", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  /* ================= COURSE MANAGEMENT ================= */
+  initialize();
+}, [api]);
+
+/* ================= TAB-BASED DOUBTS LOAD ================= */
+useEffect(() => {
+  if (activeTab !== "doubts") return;
+
+  const fetchDoubts = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/faculty/doubts");
+      setDoubts(res.data);
+    } catch (err) {
+      console.error("Failed to load doubts", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchDoubts();
+}, [activeTab, api]);
+
+/* ================= TAB-BASED ADVISOR LOAD ================= */
+useEffect(() => {
+  if (activeTab !== "advisor") return;
+
+  const fetchPendingDocuments = async () => {
+    try {
+      setLoading(true);
+
+      const studentsRes = await api.get("/advisor/students");
+      const allDocs: any[] = [];
+
+      for (const student of studentsRes.data) {
+        const docsRes = await api.get(`/advisor/students/${student.user_id}/documents`);
+        const pending = docsRes.data.filter((doc: any) => doc.status === "PENDING");
+
+        allDocs.push(
+          ...pending.map((doc: any) => ({
+            ...doc,
+            fname: student.fname,
+            lname: student.lname
+          }))
+        );
+      }
+
+      setPendingDocs(allDocs);
+    } catch (err) {
+      console.error("Failed to load pending docs", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchPendingDocuments();
+}, [activeTab, api]);
+//course mngmnt
   const handleCreateCourse = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -265,7 +318,7 @@ export default function FacultyDashboard({
         allDocs.push(...pending.map((doc: any) => ({ ...doc, fname: student.fname, lname: student.lname })));
       }
       setPendingDocs(allDocs);
-      setActiveTab("advisor");
+      
     } catch (err) {
       console.error("Failed to load pending docs", err);
     } finally {
@@ -300,10 +353,8 @@ export default function FacultyDashboard({
       sidebarItems={sidebarItems}
       activeItem={activeTab === "course-details" || activeTab === "submissions" ? "classes" : activeTab}
       onSidebarChange={(id) => {
-        if (id === "classes") setActiveTab("classes");
-        if (id === "doubts") loadDoubts();
-        if (id === "advisor") loadPendingDocuments();
-      }}
+  setActiveTab(id);
+}}
       title="Faculty Portal"
     >
       <header className="page-header">

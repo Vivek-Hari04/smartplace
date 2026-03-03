@@ -1,0 +1,360 @@
+const pool = require("../../config/db");
+
+/* =========================
+   STUDENT PROFILE
+========================= */
+
+async function getStudentProfile(userId) {
+  const result = await pool.query(
+    `SELECT * FROM students WHERE user_id = $1`,
+    [userId]
+  );
+  return result.rows[0];
+}
+
+async function updateStudentProfile(userId, updateData) {
+  if (!updateData || Object.keys(updateData).length === 0) {
+    throw new Error("No fields provided to update");
+  }
+
+  const fields = Object.keys(updateData);
+  const values = Object.values(updateData);
+
+  const setClause = fields
+    .map((field, index) => `${field} = $${index + 2}`)
+    .join(", ");
+
+  const result = await pool.query(
+    `UPDATE students 
+     SET ${setClause}
+     WHERE user_id = $1
+     RETURNING *`,
+    [userId, ...values]
+  );
+
+  return result.rows[0];
+}
+
+/* =========================
+   COURSES
+========================= */
+
+async function getEnrolledCourses(userId) {
+  const result = await pool.query(
+    `SELECT e.course_id,
+            c.name,
+            c.faculty_id,
+            u.fname,
+            u.lname
+     FROM enrollments e
+     JOIN courses c ON e.course_id = c.course_id
+     JOIN users u ON c.faculty_id = u.user_id
+     WHERE e.student_id = $1`,
+    [userId]
+  );
+  return result.rows;
+}
+
+async function getAvailableCourses() {
+  const result = await pool.query(
+    `SELECT course_id, name
+     FROM courses
+     WHERE availability = true`
+  );
+  return result.rows;
+}
+
+async function enrollInCourse(userId, courseId) {
+  const result = await pool.query(
+    `INSERT INTO enrollments (student_id, course_id)
+     VALUES ($1, $2)
+     RETURNING *`,
+    [userId, courseId]
+  );
+  return result.rows[0];
+}
+
+async function getCourseDetails(courseId) {
+  const result = await pool.query(
+    `SELECT c.course_id,
+            c.availability,
+            c.faculty_id,
+            u.fname,
+            u.lname
+     FROM courses c
+     JOIN users u ON c.faculty_id = u.user_id
+     WHERE c.course_id = $1`,
+    [courseId]
+  );
+  return result.rows[0];
+}
+
+async function getFacultyContacts(courseId) {
+  const result = await pool.query(
+    `SELECT u.user_id, u.fname, u.lname, u.email
+     FROM courses c
+     JOIN users u ON c.faculty_id = u.user_id
+     WHERE c.course_id = $1`,
+    [courseId]
+  );
+  return result.rows[0];
+}
+
+/* =========================
+   ASSESSMENTS
+========================= */
+
+async function getUpcomingAssessments() {
+  const result = await pool.query(
+    `SELECT a.assessment_id,
+            a.title,
+            a.description,
+            a.deadline,
+            c.name AS course_name
+     FROM assessments a
+     JOIN courses c ON a.course_id = c.course_id
+     WHERE a.deadline > NOW()
+     ORDER BY a.deadline ASC`
+  );
+  return result.rows;
+}
+
+async function getAssessmentDetails(assessmentId) {
+  const result = await pool.query(
+    `SELECT a.assessment_id,
+            a.title,
+            a.description,
+            a.deadline,
+            c.name AS course_name
+     FROM assessments a
+     JOIN courses c ON a.course_id = c.course_id
+     WHERE a.assessment_id = $1`,
+    [assessmentId]
+  );
+  return result.rows[0];
+}
+
+async function startAssessment(studentId, assessmentId) {
+  const result = await pool.query(
+    `SELECT a.*
+     FROM assessments a
+     JOIN enrollments e ON a.course_id = e.course_id
+     WHERE a.assessment_id = $1
+       AND e.student_id = $2`,
+    [assessmentId, studentId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error("Assessment not available for this student");
+  }
+
+  if (result.rows[0].deadline < new Date()) {
+    throw new Error("Assessment deadline has passed");
+  }
+
+  return result.rows[0];
+}
+
+async function submitAssessment(studentId, assessmentId, submissionUrl) {
+  const result = await pool.query(
+    `INSERT INTO assessment_submissions
+     (assessment_id, student_id, submission_url)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [assessmentId, studentId, submissionUrl]
+  );
+  return result.rows[0];
+}
+
+async function getAssessmentResults(studentId) {
+  const result = await pool.query(
+    `SELECT s.submission_id,
+            s.score,
+            s.feedback,
+            s.submitted_at,
+            a.title
+     FROM assessment_submissions s
+     JOIN assessments a ON s.assessment_id = a.assessment_id
+     WHERE s.student_id = $1
+       AND s.score IS NOT NULL
+     ORDER BY s.submitted_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+async function getAssessmentHistory(studentId) {
+  const result = await pool.query(
+    `SELECT s.submission_id,
+            s.submission_url,
+            s.score,
+            s.feedback,
+            s.submitted_at,
+            a.title,
+            a.deadline
+     FROM assessment_submissions s
+     JOIN assessments a ON s.assessment_id = a.assessment_id
+     WHERE s.student_id = $1
+     ORDER BY s.submitted_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+/* =========================
+   PLACEMENT SLOTS
+========================= */
+
+async function getAvailableSlots(studentId) {
+  const result = await pool.query(
+    `SELECT pd.*, u.fname, u.lname
+     FROM placement_drives pd
+     JOIN users u ON pd.company_id = u.user_id
+     WHERE pd.drive_date >= CURRENT_DATE
+       AND pd.drive_id NOT IN (
+         SELECT drive_id
+         FROM drive_registrations
+         WHERE student_id = $1
+       )
+     ORDER BY pd.drive_date ASC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+async function bookSlot(studentId, driveId) {
+  const result = await pool.query(
+    `INSERT INTO drive_registrations (drive_id, student_id)
+     VALUES ($1, $2)
+     RETURNING *`,
+    [driveId, studentId]
+  );
+  return result.rows[0];
+}
+
+async function cancelSlot(studentId, driveId) {
+  await pool.query(
+    `DELETE FROM drive_registrations
+     WHERE drive_id = $1 AND student_id = $2`,
+    [driveId, studentId]
+  );
+  return { message: "Slot cancelled successfully" };
+}
+
+async function getMyBookedSlots(studentId) {
+  const result = await pool.query(
+    `SELECT dr.*, pd.*, u.fname, u.lname
+     FROM drive_registrations dr
+     JOIN placement_drives pd ON dr.drive_id = pd.drive_id
+     JOIN users u ON pd.company_id = u.user_id
+     WHERE dr.student_id = $1
+     ORDER BY dr.registered_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+/* =========================
+   OFFERS
+========================= */
+
+async function getEligibleOffers(studentId) {
+  const result = await pool.query(
+    `SELECT po.*, u.fname, u.lname
+     FROM placement_offers po
+     JOIN users u ON po.company_id = u.user_id
+     WHERE po.acceptance_deadline >= CURRENT_DATE
+       AND po.drive_id IN (
+         SELECT drive_id
+         FROM drive_registrations
+         WHERE student_id = $1
+           AND status = 'selected'
+       )`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+async function applyForOffer(studentId, offerId) {
+  const result = await pool.query(
+    `INSERT INTO offer_applications (offer_id, student_id)
+     VALUES ($1, $2)
+     RETURNING *`,
+    [offerId, studentId]
+  );
+  return result.rows[0];
+}
+
+async function getMyApplications(studentId) {
+  const result = await pool.query(
+    `SELECT oa.*, po.title, po.package_lpa
+     FROM offer_applications oa
+     JOIN placement_offers po ON oa.offer_id = po.offer_id
+     WHERE oa.student_id = $1
+     ORDER BY oa.applied_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+async function getOfferStatus(studentId, applicationId) {
+  const result = await pool.query(
+    `SELECT *
+     FROM offer_applications
+     WHERE application_id = $1
+       AND student_id = $2`,
+    [applicationId, studentId]
+  );
+  return result.rows[0];
+}
+
+async function withdrawApplication(studentId, applicationId) {
+  const result = await pool.query(
+    `UPDATE offer_applications
+     SET status = 'withdrawn',
+         updated_at = NOW()
+     WHERE application_id = $1
+       AND student_id = $2
+     RETURNING *`,
+    [applicationId, studentId]
+  );
+  return result.rows[0];
+}
+
+async function getOfferHistory(studentId) {
+  const result = await pool.query(
+    `SELECT oa.*, po.title, po.package_lpa
+     FROM offer_applications oa
+     JOIN placement_offers po ON oa.offer_id = po.offer_id
+     WHERE oa.student_id = $1
+     ORDER BY oa.applied_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+module.exports = {
+  getStudentProfile,
+  updateStudentProfile,
+  getEnrolledCourses,
+  getAvailableCourses,
+  enrollInCourse,
+  getCourseDetails,
+  getFacultyContacts,
+  getUpcomingAssessments,
+  getAssessmentDetails,
+  startAssessment,
+  submitAssessment,
+  getAssessmentResults,
+  getAssessmentHistory,
+  getAvailableSlots,
+  bookSlot,
+  cancelSlot,
+  getMyBookedSlots,
+  getEligibleOffers,
+  applyForOffer,
+  getMyApplications,
+  getOfferStatus,
+  withdrawApplication,
+  getOfferHistory
+};

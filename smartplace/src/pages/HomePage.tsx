@@ -1,17 +1,44 @@
+import { useState, useEffect } from 'react';
 import './styles/HomePage.css';
 
 export default function HomePage({ onEnter }: { onEnter: () => void }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const faqs = [
+    {
+      question: "How does the automated matching work?",
+      answer: "Our system analyzes job requirements and student profiles (CGPA, skills, department) in real-time. When a company posts a job, eligible students are automatically notified via the platform."
+    },
+    {
+      question: "Is the platform mobile-responsive?",
+      answer: "Yes, SmartPlace is built with a mobile-first approach. Students can track applications and receive notifications on any device."
+    },
+    {
+      question: "How are academic records verified?",
+      answer: "Faculty advisors and administrators have dedicated dashboards to verify student-uploaded documents and CGPA data before it becomes visible to recruiters."
+    }
+  ];
+
   return (
     <div className="lp-root">
       {/* Navbar */}
-      <header className="lp-header">
+      <header className={`lp-header ${scrolled ? 'lp-header-scrolled' : ''}`}>
         <div className="lp-logo">
           <span className="lp-logo-text">SmartPlace</span>
         </div>
         <nav className="lp-nav-links">
           <a href="#features">Features</a>
           <a href="#workflow">Workflow</a>
-          <a href="#about">About</a>
+          <a href="#faq">FAQ</a>
         </nav>
         <button className="lp-btn-outline" onClick={onEnter}>
           Sign In
@@ -21,46 +48,58 @@ export default function HomePage({ onEnter }: { onEnter: () => void }) {
       {/* Hero Section */}
       <main className="lp-hero">
         <div className="lp-hero-inner">
-          <div className="lp-eyebrow">The Professional Standard</div>
-          <h1 className="lp-heading">
+          <div className="lp-eyebrow animate-fade-in">The Professional Standard</div>
+          <h1 className="lp-heading animate-slide-up">
             Campus Recruitment<br />
             <span className="lp-heading-sub">Reimagined.</span>
           </h1>
-          <p className="lp-subtext">
+          <p className="lp-subtext animate-slide-up-delayed">
             A high-performance placement ecosystem connecting elite talent with industry leaders through a unified, minimal interface.
           </p>
-          <div className="lp-hero-actions">
+          <div className="lp-hero-actions animate-fade-in-delayed">
             <button className="lp-btn-primary" onClick={onEnter}>
               Get Started
             </button>
             <button className="lp-btn-secondary" onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}>
-              Learn More
+              Explore Platform
             </button>
           </div>
         </div>
       </main>
 
-      {/* Features Section */}
+      {/* Features Section - Bento Grid Style */}
       <section id="features" className="lp-section">
         <div className="lp-section-header">
           <h2 className="lp-section-title">Core Capabilities</h2>
-          <p className="lp-section-desc">Designed for every stakeholder in the placement lifecycle.</p>
+          <p className="lp-section-desc">Precision-engineered tools for the modern placement cell.</p>
         </div>
-        <div className="lp-grid">
-          <div className="lp-card">
+        
+        <div className="lp-bento-grid">
+          <div className="lp-bento-item lp-bento-main">
             <div className="lp-card-icon">01</div>
-            <h3 className="lp-card-title">Centralized Management</h3>
-            <p className="lp-card-text">Administer the entire placement drive from a single command center with granular control.</p>
+            <h3 className="lp-card-title">Centralized Command</h3>
+            <p className="lp-card-text">Manage thousands of students and hundreds of companies from a single, high-density dashboard. Track every stage of the recruitment funnel with zero lag.</p>
+            <div className="lp-bento-visual">
+              <div className="lp-visual-mockup"></div>
+            </div>
           </div>
-          <div className="lp-card">
+          
+          <div className="lp-bento-item lp-bento-accent">
             <div className="lp-card-icon">02</div>
             <h3 className="lp-card-title">Real-time Analytics</h3>
-            <p className="lp-card-text">Track application statuses, interview schedules, and selection rates as they happen.</p>
+            <p className="lp-card-text">Live tracking of selection rates and interview progress.</p>
           </div>
-          <div className="lp-card">
+          
+          <div className="lp-bento-item">
             <div className="lp-card-icon">03</div>
-            <h3 className="lp-card-title">Unified Profiles</h3>
-            <p className="lp-card-text">Comprehensive student portfolios featuring verified academic records and skill assessments.</p>
+            <h3 className="lp-card-title">Verified Profiles</h3>
+            <p className="lp-card-text">Fraud-resistant academic records vetted by faculty.</p>
+          </div>
+          
+          <div className="lp-bento-item lp-bento-wide">
+            <div className="lp-card-icon">04</div>
+            <h3 className="lp-card-title">Automated Notifications</h3>
+            <p className="lp-card-text">Instant alerts for eligibility, interview schedules, and offer letters via our unified messaging system.</p>
           </div>
         </div>
       </section>
@@ -68,37 +107,61 @@ export default function HomePage({ onEnter }: { onEnter: () => void }) {
       {/* Workflow Section */}
       <section id="workflow" className="lp-section lp-section-alt">
         <div className="lp-section-header">
-          <h2 className="lp-section-title">System Workflow</h2>
+          <h2 className="lp-section-title">The Workflow</h2>
         </div>
         <div className="lp-workflow-steps">
           <div className="lp-step">
-            <div className="lp-step-number">I</div>
+            <div className="lp-step-number">01</div>
             <div className="lp-step-content">
-              <h4>Institutional Onboarding</h4>
-              <p>Setup departments, faculty coordinators, and batch details.</p>
+              <h4>Setup</h4>
+              <p>Onboard departments and faculty coordinators.</p>
             </div>
           </div>
           <div className="lp-step">
-            <div className="lp-step-number">II</div>
+            <div className="lp-step-number">02</div>
             <div className="lp-step-content">
-              <h4>Opportunity Posting</h4>
-              <p>Companies list job profiles, eligibility criteria, and selection rounds.</p>
+              <h4>Posting</h4>
+              <p>Companies list opportunities and criteria.</p>
             </div>
           </div>
           <div className="lp-step">
-            <div className="lp-step-number">III</div>
+            <div className="lp-step-number">03</div>
             <div className="lp-step-content">
-              <h4>Automated Matching</h4>
-              <p>System identifies and notifies eligible students based on set criteria.</p>
+              <h4>Matching</h4>
+              <p>System auto-identifies eligible candidates.</p>
             </div>
           </div>
           <div className="lp-step">
-            <div className="lp-step-number">IV</div>
+            <div className="lp-step-number">04</div>
             <div className="lp-step-content">
-              <h4>Final Selection</h4>
-              <p>Seamless management of interview results and offer letter distribution.</p>
+              <h4>Selection</h4>
+              <p>Digital management of offers and results.</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="lp-section">
+        <div className="lp-section-header">
+          <h2 className="lp-section-title">Common Questions</h2>
+        </div>
+        <div className="lp-faq-container">
+          {faqs.map((faq, index) => (
+            <div 
+              key={index} 
+              className={`lp-faq-item ${activeFaq === index ? 'lp-faq-active' : ''}`}
+              onClick={() => setActiveFaq(activeFaq === index ? null : index)}
+            >
+              <div className="lp-faq-question">
+                {faq.question}
+                <span className="lp-faq-icon">{activeFaq === index ? '−' : '+'}</span>
+              </div>
+              <div className="lp-faq-answer">
+                <p>{faq.answer}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -110,11 +173,11 @@ export default function HomePage({ onEnter }: { onEnter: () => void }) {
         </div>
         <div className="lp-stat-item">
           <span className="lp-stat-num">200+</span>
-          <span className="lp-stat-lab">Partner Colleges</span>
+          <span className="lp-stat-lab">Colleges</span>
         </div>
         <div className="lp-stat-item">
-          <span className="lp-stat-num">1.2k</span>
-          <span className="lp-stat-lab">Hiring Partners</span>
+          <span className="lp-stat-num">1.2k+</span>
+          <span className="lp-stat-lab">Partners</span>
         </div>
       </section>
 
@@ -128,15 +191,15 @@ export default function HomePage({ onEnter }: { onEnter: () => void }) {
           <div className="lp-footer-links">
             <div className="lp-link-group">
               <h5>Platform</h5>
-              <a href="#">Solutions</a>
-              <a href="#">Features</a>
-              <a href="#">Security</a>
+              <a href="#features">Features</a>
+              <a href="#workflow">Workflow</a>
+              <a href="#faq">FAQ</a>
             </div>
             <div className="lp-link-group">
-              <h5>Company</h5>
-              <a href="#">About</a>
-              <a href="#">Contact</a>
+              <h5>Legal</h5>
               <a href="#">Privacy</a>
+              <a href="#">Terms</a>
+              <a href="#">Security</a>
             </div>
           </div>
         </div>

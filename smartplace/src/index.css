@@ -14,6 +14,7 @@
   --radius-md: 8px;
   --transition-speed: 0.2s;
   
+  font-size: 15px; /* Decreased from default 16px to "zoom out" */
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   line-height: 1.5;
   font-weight: 400;

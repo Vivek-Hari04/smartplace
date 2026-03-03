@@ -39,16 +39,11 @@ export default function Sidebar({ user, items, activeItem, onItemClick, title = 
             className={`nav-item ${activeItem === item.id ? 'active' : ''}`}
             onClick={() => onItemClick(item.id)}
           >
-            {item.label}
+            {item.icon && <span className="nav-icon">{item.icon}</span>}
+            <span className="nav-label">{item.label}</span>
           </button>
         ))}
       </nav>
-
-      <div className="sidebar-footer">
-        <button className="logout-btn" onClick={handleLogout}>
-          Logout
-        </button>
-      </div>
 
       <style>{`
         .sidebar {
@@ -140,6 +135,9 @@ export default function Sidebar({ user, items, activeItem, onItemClick, title = 
           transition: var(--transition-speed);
           font-size: 0.9rem;
           width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
         }
 
         .nav-item:hover {
@@ -152,6 +150,14 @@ export default function Sidebar({ user, items, activeItem, onItemClick, title = 
           background-color: var(--bg-tertiary);
           border-color: var(--border-color);
           font-weight: 500;
+        }
+
+        .nav-icon {
+          font-size: 1.1rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 20px;
         }
 
         .sidebar-footer {

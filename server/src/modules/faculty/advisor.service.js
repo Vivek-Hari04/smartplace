@@ -4,11 +4,20 @@ const pool = require("../../config/db");
 
 exports.getMyStudents = async (advisorId) => {
   const result = await pool.query(
-    `SELECT s.*, u.fname, u.lname
-     FROM students s
-     JOIN users u ON u.user_id = s.user_id
-     WHERE s.advisor_id = $1`,
-    [advisorId]
+    `SELECT 
+        s.user_id,
+        s.department,
+        s.graduation_year,
+        s.cgpa,
+        s.placement_eligible,
+        s.is_verified,
+        s.advisor_id,
+        u.fname,
+        u.lname,
+        u.email
+      FROM students s
+      JOIN users u ON s.user_id = u.user_id
+      WHERE s.advisor_id = $1`,[advisorId]
   );
 
   return result.rows;

@@ -138,14 +138,20 @@ function App() {
   }
 
   const renderDashboard = () => {
-    const userRole = role || "student";
-    
-    switch (userRole) {
+    /* Wait for role before rendering dashboard */
+      if (!role) {
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+            Loading dashboard...
+          </div>
+        );
+      }    
+    switch (role) {
       case "student": return <StudentDashboard user={session.user} accessToken={session.access_token} />;
       case "faculty": return <FacultyDashboard user={session.user} accessToken={session.access_token} />;
       case "alumni": return <AlumniDashboard user={session.user} accessToken={session.access_token} />;
       case "admin": return <AdminDashboard user={session.user} accessToken={session.access_token} />;
-      default: return <StudentDashboard user={session.user} accessToken={session.access_token} />;
+      default: return null;
     }
   };
 

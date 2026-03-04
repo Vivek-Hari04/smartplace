@@ -14,7 +14,7 @@ interface Material {
   material_id: number;
   course_id: number;
   title: string;
-  drive_link: string;
+  file_url: string;
 }
 
 interface Doubt {
@@ -64,6 +64,7 @@ export default function FacultyDashboard({
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [pendingDocs, setPendingDocs] = useState<any[]>([]);
+  const [advisorStudents, setAdvisorStudents] = useState<any[]>([]);
   const [isAdvisor, setIsAdvisor] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +72,7 @@ export default function FacultyDashboard({
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [courseFormData, setCourseFormData] = useState({ name: "", description: "" });
   const [showMaterialForm, setShowMaterialForm] = useState(false);
-  const [materialFormData, setMaterialFormData] = useState({ title: "", drive_link: "" });
+  const [materialFormData, setMaterialFormData] = useState({ title: "", file_url: "" });
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
   const [assessmentFormData, setAssessmentFormData] = useState({ title: "", description: "", deadline: "" });
   const [responseFormData, setResponseFormData] = useState({ doubt_id: 0, response: "" });
@@ -142,6 +143,7 @@ useEffect(() => {
       setLoading(true);
 
       const studentsRes = await api.get("/advisor/students");
+      setAdvisorStudents(studentsRes.data);
       const allDocs: any[] = [];
 
       for (const student of studentsRes.data) {
@@ -395,7 +397,7 @@ useEffect(() => {
               </div>
             </form>
           )}
-
+         
           <div className="table-responsive">
             <table className="data-table">
               <thead>
@@ -438,10 +440,20 @@ useEffect(() => {
             <h2>Enrolled Students ({students.length})</h2>
             <div className="table-responsive">
               <table className="data-table">
-                <thead><tr><th>Name</th><th>Email</th><th>Role</th></tr></thead>
+                <thead><tr><th>Name</th><th>Email</th><th>Attendance</th></tr></thead>
                 <tbody>
                   {students.length === 0 ? <tr><td colSpan={3}>No students enrolled.</td></tr> :
-                    students.map(s => <tr key={s.user_id}><td>{s.fname} {s.lname}</td><td>{s.email}</td><td>{s.role}</td></tr>)}
+                    students.map(s => 
+                       <tr key={s.user_id}>
+                        <td>{s.fname} {s.lname}</td>
+                        <td>{s.email}</td>
+                       <td>
+                          {s.attendance !== null && s.attendance !== undefined
+                            ? Number(s.attendance).toFixed(2)
+                            : "-"}
+                      </td>
+            </tr>
+                    )}
                 </tbody>
               </table>
             </div>
@@ -458,7 +470,7 @@ useEffect(() => {
               <form onSubmit={handleUploadMaterial} className="content-card" style={{ marginBottom: "1rem" }}>
                 <div style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
                   <input className="form-input" placeholder="Title" required value={materialFormData.title} onChange={e => setMaterialFormData({...materialFormData, title: e.target.value})} />
-                  <input className="form-input" placeholder="Drive Link" required value={materialFormData.drive_link} onChange={e => setMaterialFormData({...materialFormData, drive_link: e.target.value})} />
+                  <input className="form-input" placeholder="Drive Link" required value={materialFormData.file_url} onChange={e => setMaterialFormData({...materialFormData, file_url: e.target.value})} />
                 </div>
                 <div className="action-buttons">
                   <button type="submit" className="btn btn-primary">Upload</button>
@@ -608,10 +620,58 @@ useEffect(() => {
       {/* ADVISOR PANEL */}
       {activeTab === "advisor" && isAdvisor && (
         <section className="content-card">
+           {/* ADVISOR STUDENTS */}
+            <section className="content-card" style={{ marginBottom: "2rem" }}>
+              <h3>My Students ({advisorStudents.length})</h3>
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>First Name</th>
+                      <th>Last Name</th>
+                      <th>Email</th>
+                      <th>Department</th>
+                      <th>Graduation Year</th>
+                      <th>CGPA</th>
+                      <th>Placement Eligible</th>
+                      <th>Verified</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {advisorStudents.length === 0 ? (
+                      <tr>
+                        <td colSpan={8}>No students assigned.</td>
+                      </tr>
+                    ) : (
+                      advisorStudents.map((s) => (
+                        <tr key={s.user_id}>
+                           <td>{s.fname}</td>
+                          <td>{s.lname}</td>
+                          <td>{s.email}</td>
+                          <td>{s.department}</td>
+                          <td>{s.graduation_year}</td>
+                          <td>{s.cgpa}</td>
+                          <td>{s.placement_eligible ? "Yes" : "No"}</td>
+                          <td>{s.is_verified ? "Yes" : "No"}</td>
+                         
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-            <h2>Pending Verifications</h2>
-            <button className="btn btn-primary" onClick={loadPendingDocuments}>Refresh</button>
+          <h2>Advisor Dashboard</h2>
+          <div style={{ display: "flex", gap: "1rem" }}>
+            {/* <button className="btn btn-secondary" onClick={loadPendingDocuments}>
+              View My Students
+            </button> */}
+            <button className="btn btn-primary" onClick={loadPendingDocuments}>
+              Refresh Documents
+            </button>
           </div>
+        </div>
           <div className="table-responsive">
             <table className="data-table">
               <thead><tr><th>Student</th><th>Document</th><th>Status</th><th>Actions</th></tr></thead>

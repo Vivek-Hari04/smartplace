@@ -27,9 +27,8 @@ export default function Auth({ onBack }: AuthProps) {
           onClick={handleBack}
           aria-label="Back to home"
         >
-          <span className="auth-back-icon" aria-hidden="true">←</span>
-        </button>
-        <h2 className="auth-title">SmartPlace</h2>
+          <span className="auth-back-icon" aria-hidden="true">←</span></button>
+          <h2 className="auth-title">SmartPlace</h2>
       </div>
 
       {isLogin ? (

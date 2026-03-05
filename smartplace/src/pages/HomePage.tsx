@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ThemeToggle from '../components/ThemeToggle';
 import './styles/HomePage.css';
 
 export default function HomePage({ onEnter }: { onEnter: () => void }) {
@@ -40,9 +41,12 @@ export default function HomePage({ onEnter }: { onEnter: () => void }) {
           <a href="#workflow">Workflow</a>
           <a href="#faq">FAQ</a>
         </nav>
-        <button className="lp-btn-outline" onClick={onEnter}>
-          Sign In
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <ThemeToggle placement="header" />
+          <button className="lp-btn-outline" onClick={onEnter}>
+            Sign In
+          </button>
+        </div>
       </header>
 
       {/* Hero Section */}

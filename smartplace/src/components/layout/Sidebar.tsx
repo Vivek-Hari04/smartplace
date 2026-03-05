@@ -44,7 +44,9 @@ export default function Sidebar({ user, items, activeItem, onItemClick, title = 
           </button>
         ))}
       </nav>
-
+      <div className="sidebar-footer">
+        <button className="logout-btn" onClick={handleLogout}>Logout</button>
+      </div>  
       <style>{`
         .sidebar {
           width: 260px;

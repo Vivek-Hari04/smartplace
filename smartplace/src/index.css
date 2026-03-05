@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&display=swap");
 
 :root {
   /* Light theme palette (default) */
@@ -13,9 +13,13 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --transition-speed: 0.2s;
-  
+
   font-size: 15px; /* Decreased from default 16px to "zoom out" */
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  font-family:
+    "DM Sans",
+    system-ui,
+    -apple-system,
+    sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -25,9 +29,27 @@
   background-color: var(--bg-primary);
 }
 
-/* Dark theme overrides when user’s system prefers dark mode */
+/* Explicit theme overrides (set on <html data-theme="...">) */
+:root[data-theme="dark"] {
+  --bg-primary: #000000;
+  --bg-secondary: #0a0a0a;
+  --bg-tertiary: #111111;
+  --border-color: #222222;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --accent-color: #ffffff;
+  --danger-color: #ff4444;
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* If no explicit theme is chosen, follow the OS preference */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg-primary: #000000;
     --bg-secondary: #0a0a0a;
     --bg-tertiary: #111111;
@@ -69,6 +91,55 @@ button {
   font-family: inherit;
 }
 
+/* Theme toggle button */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  transition:
+    transform var(--transition-speed),
+    opacity var(--transition-speed),
+    background-color var(--transition-speed),
+    border-color var(--transition-speed);
+}
+
+.theme-toggle--floating {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+}
+
+.theme-toggle--header {
+  margin-right: 0.75rem;
+}
+
+.theme-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.theme-toggle:active {
+  transform: translateY(0);
+}
+
+.theme-toggle__text {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 480px) {
+  .theme-toggle__text {
+    display: none;
+  }
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
   width: 8px;
@@ -76,14 +147,14 @@ button {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary); 
+  background: var(--bg-primary);
 }
- 
+
 ::-webkit-scrollbar-thumb {
-  background: var(--border-color); 
+  background: var(--border-color);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #333; 
+  background: #333;
 }

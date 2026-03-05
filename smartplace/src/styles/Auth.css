@@ -10,14 +10,17 @@
 }
 
 .auth-header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
 }
 
 .auth-back {
+  position: absolute;
+  left: 0.75rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -80,8 +83,14 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .auth-form {
@@ -102,7 +111,8 @@
   color: var(--text-secondary);
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
   width: 100%;
   box-sizing: border-box;
   padding: 0.75rem;
@@ -123,7 +133,8 @@
   flex: 1;
 }
 
-.form-input:focus, .form-select:focus {
+.form-input:focus,
+.form-select:focus {
   outline: none;
   border-color: var(--text-primary);
 }

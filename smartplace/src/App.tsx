@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import Auth from "./components/Auth";
+import ThemeToggle from "./components/ThemeToggle";
 import HomePage from "./pages/HomePage";
 import StudentDashboard from "./pages/StudentDashboard";
 import FacultyDashboard from "./pages/FacultyDashboard";
@@ -125,16 +126,28 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>SmartPlace</div>
-        <div>Loading application...</div>
-      </div>
+      <>
+        <ThemeToggle />
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ fontSize: '1.2rem', fontWeight: 600 }}>SmartPlace</div>
+          <div>Loading application...</div>
+        </div>
+      </>
     );
   }
 
   if (!session) {
-    if (showAuth) return <Auth onBack={() => setShowAuth(false)} />;
-    return <HomePage onEnter={() => setShowAuth(true)} />;
+    if (showAuth) {
+      return (
+        <>
+          <ThemeToggle />
+          <Auth onBack={() => setShowAuth(false)} />
+        </>
+      );
+    }
+    return (
+      <HomePage onEnter={() => setShowAuth(true)} />
+    );
   }
 
   const renderDashboard = () => {
@@ -155,7 +168,12 @@ function App() {
     }
   };
 
-  return <>{renderDashboard()}</>;
+  return (
+    <>
+      <ThemeToggle />
+      {renderDashboard()}
+    </>
+  );
 }
 
 export default App;

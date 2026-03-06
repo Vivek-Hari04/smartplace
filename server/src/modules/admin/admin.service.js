@@ -43,6 +43,26 @@ exports.assignAdvisor = async (studentId, advisorId) => {
 
 /* SYSTEM OVERSIGHT */
 
+exports.getPendingDrives = async () => {
+  const result = await pool.query(
+    `SELECT pd.*, c.company_name 
+     FROM placement_drives pd
+     LEFT JOIN companies c ON pd.company_id = c.user_id
+     WHERE pd.status = 'PENDING'
+     ORDER BY pd.drive_date ASC`
+  );
+  return result.rows;
+};
+
+exports.updateDriveStatus = async (driveId, status) => {
+  const result = await pool.query(
+    "UPDATE placement_drives SET status = $1 WHERE drive_id = $2 RETURNING *",
+    [status, driveId]
+  );
+  if (!result.rowCount) throw new Error("Drive not found");
+  return result.rows[0];
+};
+
 exports.getStats = async () => {
   const queries = {
     totalStudents: "SELECT COUNT(*) FROM students",

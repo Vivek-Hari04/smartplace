@@ -69,3 +69,24 @@ exports.getFacultyList = async (req, res, next) => {
     next(err);
   }
 };
+
+/* PLACEMENT DRIVES */
+
+exports.getPendingDrives = async (req, res, next) => {
+  try {
+    const drives = await adminService.getPendingDrives();
+    res.json(drives);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateDriveStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    const drive = await adminService.updateDriveStatus(req.params.id, status);
+    res.json({ message: `Drive ${status.toLowerCase()} successfully`, drive });
+  } catch (err) {
+    next(err);
+  }
+};

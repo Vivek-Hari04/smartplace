@@ -8,6 +8,7 @@ import FacultyDashboard from "./pages/FacultyDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import AlumniDashboard from "./pages/AlumniDashboard";
 import CompanyDashboard from "./pages/CompanyDashboard";
+import NotFound from "./pages/NotFound";
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -124,6 +125,15 @@ function App() {
   }, [fetchRole]); // fetchRole is now stable
 
   /* ================= RENDER LOGIC ================= */
+
+  if (window.location.pathname !== "/") {
+    return (
+      <>
+        <ThemeToggle />
+        <NotFound />
+      </>
+    );
+  }
 
   if (loading) {
     return (

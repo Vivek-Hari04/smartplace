@@ -19,6 +19,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+/* LOGGER */
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 /*SUPABASE CLIENT(Used for token validation)*/
 
 const supabase = createClient(
@@ -93,6 +99,9 @@ app.get("/student_list", authenticateUser, async (req, res) => {
     res.status(500).json({ error: "DB query failed" });
   }
 });
+
+/* TEST ROUTE */
+app.get("/ping", (req, res) => res.send("pong"));
 
 /*PROTECT ALL MAIN API ROUTES*/
 

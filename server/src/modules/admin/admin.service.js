@@ -4,9 +4,49 @@ const pool = require("../../config/db");
 
 exports.getAllUsers = async () => {
   const result = await pool.query(
-    "SELECT user_id, fname, lname, email, role, created_at FROM users ORDER BY created_at DESC"
+    `SELECT u.user_id, u.fname, u.lname, u.email, u.role, u.is_verified, u.created_at, ur.reason as rejection_reason
+     FROM users u
+     LEFT JOIN user_rejections ur ON u.user_id = ur.user_id
+     ORDER BY u.created_at DESC`
   );
   return result.rows;
+};
+
+exports.getPendingUsers = async () => {
+  const result = await pool.query(
+    `SELECT u.user_id, u.fname, u.lname, u.email, u.role, u.created_at 
+     FROM users u
+     LEFT JOIN user_rejections ur ON u.user_id = ur.user_id
+     WHERE u.is_verified = false 
+     AND u.role != 'admin' 
+     AND ur.user_id IS NULL
+     ORDER BY u.created_at ASC`
+  );
+  return result.rows;
+};
+
+exports.verifyUser = async (userId) => {
+  // Clear any existing rejection first
+  await pool.query("DELETE FROM user_rejections WHERE user_id = $1", [userId]);
+  
+  const result = await pool.query(
+    "UPDATE users SET is_verified = true WHERE user_id = $1 RETURNING *",
+    [userId]
+  );
+  if (!result.rowCount) throw new Error("User not found");
+  return result.rows[0];
+};
+
+exports.rejectUser = async (userId, reason, description) => {
+  const result = await pool.query(
+    `INSERT INTO user_rejections (user_id, reason, description) 
+     VALUES ($1, $2, $3) 
+     ON CONFLICT (user_id) DO UPDATE 
+     SET reason = EXCLUDED.reason, description = EXCLUDED.description, rejected_at = NOW()
+     RETURNING *`,
+    [userId, reason, description]
+  );
+  return result.rows[0];
 };
 
 exports.getPendingStudents = async () => {

@@ -11,6 +11,34 @@ exports.getAllUsers = async (req, res, next) => {
   }
 };
 
+exports.getPendingUsers = async (req, res, next) => {
+  try {
+    const users = await adminService.getPendingUsers();
+    res.json(users);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.verifyUser = async (req, res, next) => {
+  try {
+    const user = await adminService.verifyUser(req.params.id);
+    res.json({ message: "User verified successfully", user });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.rejectUser = async (req, res, next) => {
+  try {
+    const { reason, description } = req.body;
+    const user = await adminService.rejectUser(req.params.id, reason, description);
+    res.json({ message: "User rejected successfully", user });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getPendingStudents = async (req, res, next) => {
   try {
     const students = await adminService.getPendingStudents();

@@ -7,6 +7,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import FacultyDashboard from "./pages/FacultyDashboard";
 import CompanyDashboard from "./pages/CompanyDashboard";
 import AlumniDashboard from "./pages/AlumniDashboard";
+import WaitingPage from "./pages/WaitingPage";
 import HomePage from "./pages/HomePage";
 import ProfileEditing from "./pages/ProfileEditing";
 import "./index.css";
@@ -14,12 +15,14 @@ import "./index.css";
 function App() {
   const [session, setSession] = useState(null);
   const [role, setRole] = useState(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [rejection, setRejection] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) fetchRole(session.user.id);
+      if (session) fetchUserData(session.user.id);
       else setLoading(false);
     });
 
@@ -27,9 +30,11 @@ function App() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) fetchRole(session.user.id);
+      if (session) fetchUserData(session.user.id);
       else {
         setRole(null);
+        setIsVerified(false);
+        setRejection(null);
         setLoading(false);
       }
     });
@@ -37,19 +42,28 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchRole = async (userId) => {
+  const fetchUserData = async (userId) => {
     try {
       const { data, error } = await supabase
         .from("users")
-        .select("role")
+        .select("role, is_verified")
         .eq("user_id", userId)
         .single();
 
       if (error) throw error;
-      console.log("Synced role from DB:", data.role);
+      
+      const { data: rejData } = await supabase
+        .from("user_rejections")
+        .select("reason, description")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      console.log("Synced user data from DB:", data);
       setRole(data.role);
+      setIsVerified(data.is_verified);
+      setRejection(rejData);
     } catch (err) {
-      console.error("Error fetching role:", err);
+      console.error("Error fetching user data:", err);
     } finally {
       setLoading(false);
     }
@@ -75,13 +89,27 @@ function App() {
   }
 
   const renderDashboard = () => {
+    // Admins bypass verification
+    if (role === "admin") {
+      return <AdminDashboard user={session.user} accessToken={session.access_token} />;
+    }
+
+    // New users go to profile editing
+    if (!role) {
+      return <ProfileEditing user={session.user} onComplete={() => fetchUserData(session.user.id)} />;
+    }
+
+    // Check verification for non-admins
+    if (!isVerified) {
+      return <WaitingPage user={session.user} rejection={rejection} />;
+    }
+
     switch (role) {
-      case "admin": return <AdminDashboard user={session.user} accessToken={session.access_token} />;
       case "student": return <StudentDashboard user={session.user} accessToken={session.access_token} />;
       case "faculty": return <FacultyDashboard user={session.user} accessToken={session.access_token} />;
       case "company": return <CompanyDashboard user={session.user} accessToken={session.access_token} />;
       case "alumni": return <AlumniDashboard user={session.user} accessToken={session.access_token} />;
-      default: return <ProfileEditing user={session.user} onComplete={() => fetchRole(session.user.id)} />;
+      default: return <ProfileEditing user={session.user} onComplete={() => fetchUserData(session.user.id)} />;
     }
   };
 

@@ -12,6 +12,7 @@ router.use(roleMiddleware("admin"));
 /* USER MANAGEMENT */
 router.get("/users", adminController.getAllUsers);
 router.get("/students", adminController.getFilteredStudents);
+router.get("/departments", adminController.getDepartments);
 // router.get("/students", getFilteredStudents);
 router.get("/students/pending", adminController.getPendingStudents);
 router.patch("/students/:id/verify", adminController.verifyStudent);

@@ -32,11 +32,11 @@ exports.getFilteredStudents = async (filters) => {
   `;
 
   if (departments) {
-    const deptArray = departments.split(',');
-    const placeholders = deptArray.map(() => `$${paramIndex++}`).join(',');
-    query += ` AND s.department IN (${placeholders})`;
-    queryArgs.push(...deptArray);
-  }
+      const deptArray = departments.split(',').map(d => d.toLowerCase());
+      const placeholders = deptArray.map(() => `$${paramIndex++}`).join(',');
+      query += ` AND LOWER(s.department) IN (${placeholders})`;
+      queryArgs.push(...deptArray);
+}
 
   if (min_cgpa) {
     query += ` AND s.cgpa >= $${paramIndex++}`;
@@ -57,6 +57,14 @@ exports.getFilteredStudents = async (filters) => {
   return result.rows;
 };
 
+exports.getDepartments = async () => {
+  const result = await pool.query(`
+    SELECT DISTINCT department
+    FROM students
+    ORDER BY department
+  `);
+  return result.rows;
+};
 
 exports.verifyStudent = async (studentId) => {
   const result = await pool.query(

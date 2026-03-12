@@ -31,7 +31,7 @@ export default function AdminDashboard({ user, accessToken }) {
   const [maxCgpa, setMaxCgpa] = useState('');
   const [placementEligible, setPlacementEligible] = useState('All');
   const [filteredStudents, setFilteredStudents] = useState([]);
-
+  const [departments, setDepartments] = useState([]);
 
   const api = useMemo(() => {
     return axios.create({
@@ -73,8 +73,22 @@ export default function AdminDashboard({ user, accessToken }) {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const res = await api.get("/admin/departments");
+      setDepartments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch departments");
+    }
+  };
+
   useEffect(() => {
     fetchData(activeTab);
+
+    if (activeTab === "filter-students") {
+      fetchDepartments();
+    }
+
     setSelectedDrive(null);
   }, [activeTab]);
 
@@ -714,22 +728,34 @@ export default function AdminDashboard({ user, accessToken }) {
               
               <div style={{ marginBottom: '1.5rem' }}>
                 <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Department</h4>
-                {['CSE', 'ECE', 'ME', 'IT', 'AI', 'CV'].map(dept => (
-                  <label key={dept} style={{ marginRight: '1.25rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <input 
-                      type="checkbox" 
-                      value={dept} 
-                      checked={selectedDepartments.includes(dept)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedDepartments([...selectedDepartments, dept]);
-                        } else {
-                          setSelectedDepartments(selectedDepartments.filter(d => d !== dept));
-                        }
-                      }} 
-                    /> {dept}
-                  </label>
-                ))}
+               {departments.map(dep => (
+                <label 
+                  key={dep.department}
+                  style={{
+                    marginRight: '1.25rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  <input 
+                    type="checkbox"
+                    value={dep.department}
+                    checked={selectedDepartments.includes(dep.department)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedDepartments([...selectedDepartments, dep.department]);
+                      } else {
+                        setSelectedDepartments(
+                          selectedDepartments.filter(d => d !== dep.department)
+                        );
+                      }
+                    }}
+                  />
+                  {dep.department}
+                </label>
+              ))}
               </div>
 
               <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>

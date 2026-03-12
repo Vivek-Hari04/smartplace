@@ -150,6 +150,27 @@ async function submitAssessment(req, res) {
   }
 }
 
+async function submitAssessment(req, res) {
+  try {
+    const studentId = req.user.user_id || req.user.id;
+    const { assessmentId } = req.params;
+    const { submission_url } = req.body;
+    
+    if (!submission_url) {
+      return res.status(400).json({ error: "submission_url is required" });
+    }
+
+    const data = await studentService.submitAssessment(
+      studentId,
+      assessmentId,
+      submission_url
+    );
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 async function getAssessmentResults(req, res) {
   try {
     const data = await studentService.getAssessmentResults(req.user.id);

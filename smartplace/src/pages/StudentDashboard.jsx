@@ -23,6 +23,11 @@ export default function StudentDashboard({
   const [isMaterialsModalOpen, setIsMaterialsModalOpen] = useState(false);
   const [currentMaterials, setCurrentMaterials] = useState([]);
 
+  // Submission Modal State
+  const [isSubmissionModalOpen, setIsSubmissionModalOpen] = useState(false);
+  const [currentAssessmentData, setCurrentAssessmentData] = useState(null);
+  const [submissionUrl, setSubmissionUrl] = useState("");
+
   const needsOnboarding = useMemo(() => {
     return profile && profile.user_id === null;
   }, [profile]);
@@ -384,7 +389,20 @@ export default function StudentDashboard({
                     {a.score !== undefined && a.score !== null ? (
                       <span>Score: {a.score}</span>
                     ) : (
-                      <button className="btn btn-primary btn-sm">Start Test</button>
+                      <button 
+                        className="btn btn-primary btn-sm"
+                        onClick={async () => {
+                          try {
+                            const res = await api.get(`/assessments/${a.assessment_id}/start`);
+                            setCurrentAssessmentData(res.data);
+                            setIsSubmissionModalOpen(true);
+                          } catch (err) {
+                            alert("Failed to fetch assessment details.");
+                          }
+                        }}
+                      >
+                        Start Test
+                      </button>
                     )}
                   </td>
                 </tr>
@@ -573,6 +591,78 @@ export default function StudentDashboard({
           </div>
         </div>
       </header>
+
+      {/* MATERIALS MODAL */}
+      {isMaterialsModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Course Materials</h2>
+            <div className="modal-scroll-area">
+              {currentMaterials.length === 0 ? (
+                <p>No materials available for this course.</p>
+              ) : (
+                <ul style={{ listStyleType: "none", padding: 0 }}>
+                  {currentMaterials.map((material) => (
+                    <li key={material.material_id} style={{ marginBottom: "1rem", padding: "1rem", border: "1px solid #ddd", borderRadius: "4px" }}>
+                      <h4>{material.title}</h4>
+                      <a href={material.file_url} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">View Document</a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <button className="btn btn-secondary mt-2" onClick={() => setIsMaterialsModalOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* START TEST MODAL */}
+      {isSubmissionModalOpen && currentAssessmentData && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>{currentAssessmentData.title}</h2>
+            <p style={{marginTop: "0.5rem", marginBottom: "1.5rem", color: "#6b7280"}}>
+              {currentAssessmentData.description || "No description provided."}
+            </p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <input 
+                className="form-input" 
+                type="text" 
+                placeholder="Paste your submission link" 
+                value={submissionUrl}
+                onChange={(e) => setSubmissionUrl(e.target.value)}
+              />
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button 
+                  className="btn btn-primary" 
+                  onClick={async () => {
+                    try {
+                      await api.post(`/assessments/${currentAssessmentData.assessment_id}/submit`, { submission_url: submissionUrl });
+                      alert("Assessment submitted successfully!");
+                      setIsSubmissionModalOpen(false);
+                      setSubmissionUrl("");
+                      // Optionally refresh history
+                      const res = await api.get("/assessments/history");
+                      setAssessments(res.data);
+                    } catch (err) {
+                      alert("Failed to submit assessment.");
+                    }
+                  }}
+                >
+                  Submit
+                </button>
+                <button className="btn btn-secondary" onClick={() => {
+                  setIsSubmissionModalOpen(false);
+                  setSubmissionUrl("");
+                }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {needsOnboarding && (
         <Onboarding

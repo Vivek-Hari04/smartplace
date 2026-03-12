@@ -368,10 +368,12 @@ exports.getSubmissions = async (facultyId, assessmentId) => {
   }
 
   const result = await pool.query(
-    `SELECT s.submission_id, s.student_id, s.score AS marks, s.submitted_at, s.feedback
+    `SELECT s.submission_id, s.student_id, s.score AS marks, s.submitted_at, s.feedback, s.submission_url,
+            u.fname, u.lname
      FROM assessment_submissions s
      JOIN assessments a ON a.assessment_id = s.assessment_id
      JOIN courses c ON c.course_id = a.course_id
+     JOIN users u ON s.student_id = u.user_id
      WHERE a.assessment_id = $1 AND c.faculty_id = $2
      ORDER BY s.submitted_at`,
     [assessmentId, facultyId]

@@ -13,6 +13,15 @@ async function getStudentProfile(req, res) {
   }
 }
 
+async function getStaffAdvisors(req, res) {
+  try {
+    const data = await studentService.getStaffAdvisors();
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 async function updateStudentProfile(req, res) {
   try {
     const data = await studentService.updateStudentProfile(
@@ -268,6 +277,7 @@ async function getOfferHistory(req, res) {
 
 module.exports = {
   getStudentProfile,
+  getStaffAdvisors,
   updateStudentProfile,
   getEnrolledCourses,
   getAvailableCourses,

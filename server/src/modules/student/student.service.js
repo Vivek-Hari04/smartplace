@@ -6,32 +6,41 @@ const pool = require("../../config/db");
 
 async function getStudentProfile(userId) {
   const result = await pool.query(
-    `SELECT * FROM students WHERE user_id = $1`,
+    `SELECT s.*, u.email, u.fname, u.lname,
+            adv.fname as advisor_fname, adv.lname as advisor_lname 
+     FROM users u
+     LEFT JOIN students s ON u.user_id = s.user_id
+     LEFT JOIN users adv ON s.advisor_id = adv.user_id
+     WHERE u.user_id = $1`,
     [userId]
   );
   return result.rows[0];
 }
 
-async function updateStudentProfile(userId, updateData) {
-  if (!updateData || Object.keys(updateData).length === 0) {
-    throw new Error("No fields provided to update");
-  }
-
-  const fields = Object.keys(updateData);
-  const values = Object.values(updateData);
-
-  const setClause = fields
-    .map((field, index) => `${field} = $${index + 2}`)
-    .join(", ");
-
+async function getStaffAdvisors() {
   const result = await pool.query(
-    `UPDATE students 
-     SET ${setClause}
-     WHERE user_id = $1
-     RETURNING *`,
-    [userId, ...values]
+    `SELECT u.user_id, u.fname, u.lname, f.department 
+     FROM users u
+     JOIN faculty f ON u.user_id = f.user_id
+     WHERE f.is_staff_advisor = true`
   );
+  return result.rows;
+}
 
+async function updateStudentProfile(userId, updateData) {
+  const { department, graduation_year, cgpa, advisor_id } = updateData;
+  
+  const result = await pool.query(
+    `INSERT INTO students (user_id, department, graduation_year, cgpa, advisor_id)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (user_id) DO UPDATE SET
+       department = EXCLUDED.department,
+       graduation_year = EXCLUDED.graduation_year,
+       cgpa = EXCLUDED.cgpa,
+       advisor_id = EXCLUDED.advisor_id
+     RETURNING *`,
+    [userId, department, graduation_year, cgpa, advisor_id]
+  );
   return result.rows[0];
 }
 
@@ -207,10 +216,11 @@ async function getAssessmentHistory(studentId) {
 
 async function getAvailableSlots(studentId) {
   const result = await pool.query(
-    `SELECT pd.*, u.fname, u.lname
+    `SELECT pd.*, c.company_name
      FROM placement_drives pd
-     JOIN users u ON pd.company_id = u.user_id
+     LEFT JOIN companies c ON pd.company_id = c.user_id
      WHERE pd.drive_date >= CURRENT_DATE
+       AND pd.status = 'APPROVED'
        AND pd.drive_id NOT IN (
          SELECT drive_id
          FROM drive_registrations
@@ -224,8 +234,8 @@ async function getAvailableSlots(studentId) {
 
 async function bookSlot(studentId, driveId) {
   const result = await pool.query(
-    `INSERT INTO drive_registrations (drive_id, student_id)
-     VALUES ($1, $2)
+    `INSERT INTO drive_registrations (drive_id, student_id, status)
+     VALUES ($1, $2, 'registered')
      RETURNING *`,
     [driveId, studentId]
   );
@@ -243,10 +253,10 @@ async function cancelSlot(studentId, driveId) {
 
 async function getMyBookedSlots(studentId) {
   const result = await pool.query(
-    `SELECT dr.*, pd.*, u.fname, u.lname
+    `SELECT dr.*, pd.*, c.company_name
      FROM drive_registrations dr
      JOIN placement_drives pd ON dr.drive_id = pd.drive_id
-     JOIN users u ON pd.company_id = u.user_id
+     LEFT JOIN companies c ON pd.company_id = c.user_id
      WHERE dr.student_id = $1
      ORDER BY dr.registered_at DESC`,
     [studentId]
@@ -335,6 +345,7 @@ async function getOfferHistory(studentId) {
 
 module.exports = {
   getStudentProfile,
+  getStaffAdvisors,
   updateStudentProfile,
   getEnrolledCourses,
   getAvailableCourses,

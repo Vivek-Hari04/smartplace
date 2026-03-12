@@ -1,78 +1,28 @@
 import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import '../styles/Dashboard.css';
 import DashboardLayout from '../components/layout/DashboardLayout';
 
-interface Stats {
-  totalStudents: number;
-  verifiedStudents: number;
-  totalFaculty: number;
-  totalCourses: number;
-  pendingDocuments: number;
-}
-
-interface PendingStudent {
-  user_id: string;
-  fname: string;
-  lname: string;
-  email: string;
-  department: string;
-  graduation_year: number;
-  cgpa: number;
-}
-
-interface Faculty {
-  user_id: string;
-  fname: string;
-  lname: string;
-  email: string;
-  department: string;
-  is_staff_advisor: boolean;
-}
-
-interface Course {
-  course_id: number;
-  name: string;
-  faculty_id: string;
-  faculty_fname: string;
-  faculty_lname: string;
-  availability: boolean;
-}
-
-interface UserRecord {
-  user_id: string;
-  fname: string;
-  lname: string;
-  email: string;
-  role: string;
-  created_at: string;
-}
-
-interface PlacementDrive {
-  drive_id: number;
-  company_id: string;
-  company_name: string;
-  drive_date: string;
-  drive_type: string;
-  mode: string;
-  status: string;
-}
-
-export default function AdminDashboard({ user, accessToken }: { user: any; accessToken: string }) {
+export default function AdminDashboard({ user, accessToken }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
   
   // Data State
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [pendingStudents, setPendingStudents] = useState<PendingStudent[]>([]);
-  const [facultyList, setFacultyList] = useState<Faculty[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [allUsers, setAllUsers] = useState<UserRecord[]>([]);
-  const [pendingDrives, setPendingDrives] = useState<PlacementDrive[]>([]);
+  const [stats, setStats] = useState(null);
+  const [pendingStudents, setPendingStudents] = useState([]);
+  const [facultyList, setFacultyList] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [pendingDrives, setPendingDrives] = useState([]);
+  const [allDrives, setAllDrives] = useState([]);
+  const [registrants, setRegistrants] = useState([]);
+  const [selectedDrive, setSelectedDrive] = useState(null);
 
   // Modal/Form State
   const [showAdvisorModal, setShowAdvisorModal] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState('');
 
   const api = useMemo(() => {
@@ -82,7 +32,7 @@ export default function AdminDashboard({ user, accessToken }: { user: any; acces
     });
   }, [accessToken]);
 
-  const fetchData = async (tab: string) => {
+  const fetchData = async (tab) => {
     setLoading(true);
     try {
       if (tab === 'overview') {
@@ -103,6 +53,10 @@ export default function AdminDashboard({ user, accessToken }: { user: any; acces
       } else if (tab === 'drives') {
         const res = await api.get('/admin/drives/pending');
         setPendingDrives(res.data);
+      } else if (tab === 'all-drives') {
+        const res = await api.get('/admin/drives');
+        console.log('All Drives API Response:', res.data);
+        setAllDrives(res.data);
       }
     } catch (err) {
       console.error(`Error fetching ${tab}:`, err);
@@ -113,11 +67,12 @@ export default function AdminDashboard({ user, accessToken }: { user: any; acces
 
   useEffect(() => {
     fetchData(activeTab);
+    setSelectedDrive(null);
   }, [activeTab]);
 
   /* ACTIONS */
 
-  const handleVerifyStudent = async (id: string) => {
+  const handleVerifyStudent = async (id) => {
     try {
       await api.patch(`/admin/students/${id}/verify`);
       setPendingStudents(prev => prev.filter(s => s.user_id !== id));
@@ -141,20 +96,85 @@ export default function AdminDashboard({ user, accessToken }: { user: any; acces
     }
   };
 
-  const handleDriveStatus = async (driveId: number, status: string) => {
+  const handleDriveStatus = async (driveId, status) => {
     try {
       await api.patch(`/admin/drives/${driveId}/status`, { status });
       setPendingDrives(prev => prev.filter(d => d.drive_id !== driveId));
+      if (activeTab === 'all-drives') fetchData('all-drives');
       alert(`Drive ${status.toLowerCase()}ed successfully`);
     } catch (err) {
       alert('Status update failed');
     }
   };
 
+  const fetchRegistrants = async (drive) => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/admin/drives/${drive.drive_id}/registrants`);
+      setRegistrants(res.data);
+      setSelectedDrive(drive);
+    } catch (err) {
+      alert('Failed to fetch registrants');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = () => {
+    if (!selectedDrive || registrants.length === 0) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+
+    // Add Title
+    doc.setFontSize(20);
+    doc.text(`Attendee List: ${selectedDrive.company_name}`, 14, 22);
+    
+    // Add Drive Info
+    doc.setFontSize(11);
+    doc.setTextColor(100);
+    doc.text(`Drive Date: ${new Date(selectedDrive.drive_date).toLocaleDateString()}`, 14, 30);
+    doc.text(`Type: ${selectedDrive.drive_type.toUpperCase()} | Mode: ${selectedDrive.mode.toUpperCase()}`, 14, 35);
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, 14, 40);
+
+    // Prepare Table Data
+    const tableColumn = ["#", "Name", "Email", "Department", "CGPA", "Status"];
+    const tableRows = registrants.map((r, index) => [
+      index + 1,
+      `${r.fname} ${r.lname}`,
+      r.email,
+      r.department,
+      r.cgpa,
+      r.status.toUpperCase()
+    ]);
+
+    // Add Table
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 50,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246] },
+      didDrawPage: (data) => {
+        // Footer / Watermark
+        doc.setFontSize(10);
+        doc.setTextColor(150);
+        const footerText = "SmartPlace - Campus Recruitment Reimagined";
+        const textWidth = doc.getTextWidth(footerText);
+        doc.text(footerText, (pageWidth - textWidth) / 2, pageHeight - 10);
+      }
+    });
+
+    // Save PDF
+    doc.save(`Attendees_${selectedDrive.company_name.replace(/\s+/g, '_')}_${selectedDrive.drive_id}.pdf`);
+  };
+
   const sidebarItems = [
     { id: 'overview', label: 'Overview' },
     { id: 'students', label: 'Pending Students' },
     { id: 'drives', label: 'Drive Requests' },
+    { id: 'all-drives', label: 'All Drives' },
     { id: 'faculty', label: 'Faculty List' },
     { id: 'courses', label: 'All Courses' },
     { id: 'users', label: 'User Directory' },
@@ -308,6 +328,7 @@ export default function AdminDashboard({ user, accessToken }: { user: any; acces
           <h2 style={{ margin: 0, fontSize: '1.25rem' }}>
             {activeTab === 'students' ? 'Verification Queue' : 
              activeTab === 'drives' ? 'Placement Drive Requests' :
+             activeTab === 'all-drives' ? 'All Placement Drives' :
              activeTab === 'faculty' ? 'Faculty Directory' :
              activeTab === 'courses' ? 'Academic Courses' :
              activeTab === 'users' ? 'User Directory' : 'System Activity'}
@@ -389,6 +410,168 @@ export default function AdminDashboard({ user, accessToken }: { user: any; acces
                   ))}
               </tbody>
             </table>
+          )}
+
+          {activeTab === 'all-drives' && (
+            <div style={{ padding: '1.5rem' }}>
+              {!selectedDrive ? (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div>
+                      <h3 style={{ margin: 0 }}>All Placement Drives</h3>
+                      <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                        Manage both upcoming and historical recruitment events.
+                      </p>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
+                       <span className="badge-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>Approved: {allDrives.filter(d => d.status === 'APPROVED').length}</span>
+                       <span className="badge-pill" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>Pending: {allDrives.filter(d => d.status === 'PENDING').length}</span>
+                    </div>
+                  </div>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Company</th>
+                        <th>Date</th>
+                        <th>Type / Mode</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allDrives.length === 0 ? (
+                        <tr><td colSpan={5} style={{textAlign:'center', padding: '3rem'}}>No placement drives found</td></tr>
+                      ) : (
+                        allDrives.map(d => (
+                          <tr key={d.drive_id}>
+                            <td><strong>{d.company_name || 'Unknown Company'}</strong></td>
+                            <td>{new Date(d.drive_date).toLocaleDateString()}</td>
+                            <td>
+                               <span className="badge-pill" style={{background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6'}}>
+                                {d.drive_type.toUpperCase()}
+                              </span>
+                              <div className="user-id-text" style={{marginTop: '4px'}}>{d.mode.toUpperCase()}</div>
+                            </td>
+                            <td>
+                              <span className={`badge-pill ${d.status.toLowerCase()}`} style={{
+                                background: d.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.1)' : 
+                                            d.status === 'PENDING' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                color: d.status === 'APPROVED' ? '#10b981' : 
+                                       d.status === 'PENDING' ? '#f59e0b' : '#ef4444'
+                              }}>
+                                {d.status}
+                              </span>
+                            </td>
+                            <td>
+                              <button className="btn btn-secondary btn-sm" onClick={() => fetchRegistrants(d)}>
+                                Details & Registrants
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                <div className="drive-detail-container animate-fade-in">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
+                    <button className="btn btn-secondary" style={{ padding: '0.5rem' }} onClick={() => setSelectedDrive(null)}>
+                      ← Back to List
+                    </button>
+                    <div>
+                      <h2 style={{ margin: 0 }}>{selectedDrive.company_name}</h2>
+                      <span className="user-id-text">Placement Drive ID: #{selectedDrive.drive_id}</span>
+                    </div>
+                  </div>
+
+                  <div className="admin-stats-grid" style={{ marginBottom: '2rem' }}>
+                    <div className="stat-card stat-blue">
+                      <span className="stat-label">Drive Date & Time</span>
+                      <span className="stat-value" style={{ fontSize: '1.25rem' }}>
+                        {new Date(selectedDrive.drive_date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                      </span>
+                      <span className="user-id-text">{selectedDrive.start_time} - {selectedDrive.end_time}</span>
+                    </div>
+                    <div className="stat-card stat-purple">
+                      <span className="stat-label">Configuration</span>
+                      <span className="stat-value" style={{ fontSize: '1.25rem' }}>
+                        {selectedDrive.drive_type} / {selectedDrive.mode}
+                      </span>
+                      <span className="user-id-text">{selectedDrive.location || 'Remote'}</span>
+                    </div>
+                    <div className="stat-card stat-green">
+                      <span className="stat-label">Participation</span>
+                      <span className="stat-value">{registrants.length}</span>
+                      <span className="user-id-text">Registered Students</span>
+                    </div>
+                  </div>
+
+                  {selectedDrive.meeting_link && (
+                    <div style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--bg-tertiary)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Meeting Link:</strong>
+                      <a href={selectedDrive.meeting_link} target="_blank" rel="noopener noreferrer" style={{ color: '#3b82f6', textDecoration: 'none' }}>
+                        {selectedDrive.meeting_link}
+                      </a>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <h3 style={{ margin: 0 }}>Registered Students</h3>
+                    <button 
+                      className="btn btn-primary" 
+                      onClick={handleDownloadPDF}
+                      disabled={registrants.length === 0}
+                      style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                    >
+                      <span style={{ fontSize: '1.2rem' }}>📄</span> Download Attendee PDF
+                    </button>
+                  </div>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Student</th>
+                        <th>Department</th>
+                        <th>Academic Record</th>
+                        <th>Application Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registrants.length === 0 ? (
+                        <tr><td colSpan={4} style={{textAlign:'center', padding: '3rem'}}>No students registered yet</td></tr>
+                      ) : (
+                        registrants.map(r => (
+                          <tr key={r.registration_id}>
+                            <td>
+                              <strong>{r.fname} {r.lname}</strong>
+                              <div className="user-id-text">{r.email}</div>
+                            </td>
+                            <td>
+                              <span className="badge-pill" style={{background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6'}}>
+                                {r.department}
+                              </span>
+                            </td>
+                            <td>
+                              <div style={{ fontWeight: 600 }}>GPA: {r.cgpa}</div>
+                            </td>
+                            <td>
+                              <span className={`badge-pill`} style={{
+                                background: r.status === 'selected' ? 'rgba(16, 185, 129, 0.1)' : 
+                                            r.status === 'rejected' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(107, 114, 128, 0.1)',
+                                color: r.status === 'selected' ? '#10b981' : 
+                                       r.status === 'rejected' ? '#ef4444' : '#6b7280'
+                              }}>
+                                {r.status.toUpperCase()}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'faculty' && (

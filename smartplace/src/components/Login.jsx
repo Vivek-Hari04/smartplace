@@ -1,17 +1,12 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-type LoginProps = {
-  onSuccess?: () => void;
-  onSwitchToRegister: () => void;
-};
-
-export default function Login({ onSwitchToRegister }: LoginProps) {
+export default function Login({ onSwitchToRegister }) {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });

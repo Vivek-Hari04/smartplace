@@ -1,0 +1,40 @@
+meta {
+  name: Login (Supabase)
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://mxhptgzugyidqbfthxbb.supabase.co/auth/v1/token?grant_type=password
+  body: json
+  auth: none
+}
+
+headers {
+  apikey: {{supabaseAnonKey}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "email": "lukysphere@gmail.com",
+    "password": "password"
+  }
+}
+
+vars:pre-request {
+  supabaseAnonKey: '''
+    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aHB0Z3p1Z3lpZHFiZnRoeGJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyOTQ1NzQsImV4cCI6MjA4Njg3MDU3NH0.6Kl_wVdzoGTfNVdhr1PomlVdlu5JVMwHvyxbloY36OU
+    
+  '''
+}
+
+vars:post-response {
+  authToken: res.body.access_token
+}
+
+tests {
+  test("should return 200 OK", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

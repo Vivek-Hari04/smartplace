@@ -2,7 +2,7 @@ import { useState } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import '../styles/Dashboard.css';
 
-export default function ProfileEditing({ user }: { user: any }) {
+export default function ProfileEditing({ user }) {
   const [activeTab, setActiveTab] = useState('profile');
 
   const sidebarItems = [

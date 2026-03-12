@@ -1,12 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 
-type RegisterProps = {
-  onSuccess?: () => void;
-  onSwitchToLogin: () => void;
-};
-
-export default function Register({ onSwitchToLogin }: RegisterProps) {
+export default function Register({ onSwitchToLogin }) {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +9,7 @@ export default function Register({ onSwitchToLogin }: RegisterProps) {
   const [lname, setLname] = useState('');
   const [role, setRole] = useState('student');
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     setLoading(true);
 
@@ -79,7 +74,7 @@ export default function Register({ onSwitchToLogin }: RegisterProps) {
         alert('Check your email for the confirmation link!');
         onSwitchToLogin();
       }
-    } catch (err: any) {
+    } catch (err) {
       alert('An unexpected error occurred: ' + err.message);
     } finally {
       setLoading(false);

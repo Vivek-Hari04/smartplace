@@ -1,0 +1,24 @@
+meta {
+  name: Update Profile
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/student/profile
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "fname": "John",
+    "lname": "Doe"
+  }
+}
+
+tests {
+  test("should return 200 OK", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

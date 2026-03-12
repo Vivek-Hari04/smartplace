@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
-type Theme = "light" | "dark";
-type Placement = "floating" | "header";
-
 const STORAGE_KEY = "smartplace.theme";
 
-function getPreferredTheme(): Theme {
+function getPreferredTheme() {
   if (typeof window === "undefined") return "light";
   return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
 }
 
-function readStoredTheme(): Theme | null {
+function readStoredTheme() {
   try {
     const v = localStorage.getItem(STORAGE_KEY);
     return v === "dark" || v === "light" ? v : null;
@@ -19,13 +16,13 @@ function readStoredTheme(): Theme | null {
   }
 }
 
-function applyTheme(theme: Theme) {
+function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
 }
 
-export default function ThemeToggle({ placement = "floating" }: { placement?: Placement }) {
+export default function ThemeToggle({ placement = "floating" } = {}) {
   const initialTheme = useMemo(() => readStoredTheme() ?? getPreferredTheme(), []);
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+  const [theme, setTheme] = useState(initialTheme);
 
   useEffect(() => {
     applyTheme(theme);

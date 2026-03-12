@@ -4,21 +4,21 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import Onboarding from './Onboarding';
 import '../styles/Dashboard.css';
 
-export default function CompanyDashboard({ user, accessToken }: { user: any; accessToken: string }) {
+export default function CompanyDashboard({ user, accessToken }) {
   const [activeTab, setActiveTab] = useState('home');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
+
+  // Data state
+  const [profile, setProfile] = useState(null);
+  const [drives, setDrives] = useState([]);
+  const [offers, setOffers] = useState([]);
+  const [selectedDriveId, setSelectedDriveId] = useState(null);
+  const [applicants, setApplicants] = useState([]);
 
   const needsOnboarding = useMemo(() => {
     return profile && profile.user_id === null;
   }, [profile]);
-
-  // Data state
-  const [profile, setProfile] = useState<CompanyProfile | null>(null);
-  const [drives, setDrives] = useState<PlacementDrive[]>([]);
-  const [offers, setOffers] = useState<PlacementOffer[]>([]);
-  const [selectedDriveId, setSelectedDriveId] = useState<number | null>(null);
-  const [applicants, setApplicants] = useState<Applicant[]>([]);
 
   const api = useMemo(() => {
     return axios.create({
@@ -27,7 +27,7 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
     });
   }, [accessToken]);
 
-  const fetchData = async (tab: string) => {
+  const fetchData = async (tab) => {
     setLoading(true);
     setError(null);
     try {
@@ -41,7 +41,7 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
         const res = await api.get('/company/offers/my');
         setOffers(res.data);
       }
-    } catch (err: any) {
+    } catch (err) {
       setError(err.response?.data?.error || 'Failed to fetch data');
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
     }
   }, [profile]);
 
-  const handleProfileUpdate = async (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
@@ -82,7 +82,7 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
       setProfile(res.data);
       setIsEditingProfile(false);
       alert('Profile updated successfully');
-    } catch (err: any) {
+    } catch (err) {
       alert(err.response?.data?.error || 'Update failed');
     } finally {
       setLoading(false);
@@ -101,7 +101,33 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
     meeting_link: ''
   });
 
-  const handleDriveRequest = async (e: React.FormEvent) => {
+  /* OFFER POSTING */
+  const [showOfferModal, setShowOfferModal] = useState(false);
+  const [offerForm, setOfferForm] = useState({
+    drive_id: '',
+    title: '',
+    description: '',
+    package_lpa: '',
+    location: '',
+    acceptance_deadline: ''
+  });
+
+  const handleOfferPost = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      await api.post('/company/offers', offerForm);
+      fetchData('offers');
+      setShowOfferModal(false);
+      alert('Job offer posted successfully');
+    } catch (err) {
+      alert(err.response?.data?.error || 'Offer posting failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDriveRequest = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
@@ -109,7 +135,7 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
       fetchData('drives');
       setShowDriveModal(false);
       alert('Drive request submitted for admin approval');
-    } catch (err: any) {
+    } catch (err) {
       alert(err.response?.data?.error || 'Request failed');
     } finally {
       setLoading(false);
@@ -117,24 +143,24 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
   };
 
   /* APPLICANTS */
-  const fetchApplicants = async (driveId: number) => {
+  const fetchApplicants = async (driveId) => {
     try {
       setLoading(true);
       const res = await api.get(`/company/drives/${driveId}/applicants`);
       setApplicants(res.data);
       setSelectedDriveId(driveId);
-    } catch (err: any) {
+    } catch (err) {
       alert(err.response?.data?.error || 'Failed to fetch applicants');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApplicantStatus = async (regId: number, status: string) => {
+  const handleApplicantStatus = async (regId, status) => {
     try {
       await api.put(`/company/applicants/${regId}/status`, { status });
-      setApplicants(prev => prev.map(a => a.registration_id === regId ? { ...a, status: status as any } : a));
-    } catch (err: any) {
+      setApplicants(prev => prev.map(a => a.registration_id === regId ? { ...a, status: status } : a));
+    } catch (err) {
       alert('Status update failed');
     }
   };
@@ -363,14 +389,14 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div className="form-group flex-1">
                   <label>Mode</label>
-                  <select className="form-input" value={driveForm.mode} onChange={e => setDriveForm({...driveForm, mode: e.target.value as any})}>
+                  <select className="form-input" value={driveForm.mode} onChange={e => setDriveForm({...driveForm, mode: e.target.value})}>
                     <option value="online">Online</option>
                     <option value="offline">Offline</option>
                   </select>
                 </div>
                 <div className="form-group flex-1">
                   <label>Type</label>
-                  <select className="form-input" value={driveForm.drive_type} onChange={e => setDriveForm({...driveForm, drive_type: e.target.value as any})}>
+                  <select className="form-input" value={driveForm.drive_type} onChange={e => setDriveForm({...driveForm, drive_type: e.target.value})}>
                     <option value="aptitude">Aptitude</option>
                     <option value="technical">Technical</option>
                     <option value="general">General</option>
@@ -385,6 +411,90 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
               <div className="action-row" style={{ marginTop: '1rem' }}>
                 <button type="submit" className="btn btn-primary">Submit Request</button>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowDriveModal(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+
+  const renderOffers = () => (
+    <section className="content-card">
+      <div className="tab-header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+        <h3>Your Job Offers</h3>
+        <button className="btn btn-primary" onClick={() => setShowOfferModal(true)}>Post New Offer</button>
+      </div>
+
+      <div className="table-responsive">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Drive Date</th>
+              <th>Package (LPA)</th>
+              <th>Deadline</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {offers.length === 0 ? <tr><td colSpan={5} style={{textAlign:'center', padding:'2rem'}}>No offers posted yet</td></tr> : 
+              offers.map(o => (
+                <tr key={o.offer_id}>
+                  <td><strong>{o.title}</strong></td>
+                  <td>{new Date(o.drive_date).toLocaleDateString()}</td>
+                  <td>{o.package_lpa}</td>
+                  <td>{new Date(o.acceptance_deadline).toLocaleDateString()}</td>
+                  <td>{o.location}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      {showOfferModal && (
+        <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
+          <div className="modal-content" style={{ background: 'var(--bg-primary)', padding: '2rem', borderRadius: '12px', width: '100%', maxWidth: '500px' }}>
+            <h3>Post New Job Offer</h3>
+            <form onSubmit={handleOfferPost} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label>Associated Drive</label>
+                <select className="form-input" required value={offerForm.drive_id} onChange={e => setOfferForm({...offerForm, drive_id: e.target.value})}>
+                  <option value="">-- Select Approved Drive --</option>
+                  {drives.filter(d => d.status === 'APPROVED').map(d => (
+                    <option key={d.drive_id} value={d.drive_id}>
+                      {new Date(d.drive_date).toLocaleDateString()} - {d.drive_type.toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                {drives.filter(d => d.status === 'APPROVED').length === 0 && (
+                  <p style={{color: 'var(--danger-color)', fontSize: '0.8rem'}}>No approved drives found. You must have an approved drive to post an offer.</p>
+                )}
+              </div>
+              <div className="form-group">
+                <label>Job Title</label>
+                <input type="text" className="form-input" required value={offerForm.title} onChange={e => setOfferForm({...offerForm, title: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Package (LPA)</label>
+                <input type="number" step="0.1" className="form-input" required value={offerForm.package_lpa} onChange={e => setOfferForm({...offerForm, package_lpa: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Acceptance Deadline</label>
+                <input type="date" className="form-input" required value={offerForm.acceptance_deadline} onChange={e => setOfferForm({...offerForm, acceptance_deadline: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Location</label>
+                <input type="text" className="form-input" value={offerForm.location} onChange={e => setOfferForm({...offerForm, location: e.target.value})} />
+              </div>
+              <div className="form-group">
+                <label>Description</label>
+                <textarea className="form-input" value={offerForm.description} onChange={e => setOfferForm({...offerForm, description: e.target.value})} />
+              </div>
+              <div className="action-row" style={{ marginTop: '1rem' }}>
+                <button type="submit" className="btn btn-primary" disabled={!offerForm.drive_id}>Post Offer</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowOfferModal(false)}>Cancel</button>
               </div>
             </form>
           </div>
@@ -422,6 +532,7 @@ export default function CompanyDashboard({ user, accessToken }: { user: any; acc
         {activeTab === 'home' && renderHome()}
         {activeTab === 'profile' && renderProfile()}
         {activeTab === 'drives' && renderDrives()}
+        {activeTab === 'offers' && renderOffers()}
       </div>
     </DashboardLayout>
   );

@@ -18,6 +18,12 @@ router.get(
   studentController.getStudentProfile
 );
 
+router.get(
+  "/advisors",
+  authMiddleware,
+  studentController.getStaffAdvisors
+);
+
 router.put(
   "/profile",
   authMiddleware,

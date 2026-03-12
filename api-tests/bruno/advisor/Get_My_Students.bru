@@ -1,0 +1,17 @@
+meta {
+  name: Get My Students
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/advisor/students
+  body: none
+  auth: inherit
+}
+
+tests {
+  test("should return 200 OK", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

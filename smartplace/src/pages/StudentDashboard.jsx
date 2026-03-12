@@ -7,25 +7,28 @@ import "../styles/Dashboard.css";
 export default function StudentDashboard({
   user,
   accessToken
-}: {
-  user: any;
-  accessToken: string;
 }) {
   const [activeTab, setActiveTab] = useState("home");
-  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
+
+  // Data states
+  const [profile, setProfile] = useState(null);
+  const [courses, setCourses] = useState([]);
+  const [assessments, setAssessments] = useState([]);
+  const [slots, setSlots] = useState([]);
+  const [offers, setOffers] = useState([]);
 
   const needsOnboarding = useMemo(() => {
-    return data && data.user_id === null;
-  }, [data]);
+    return profile && profile.user_id === null;
+  }, [profile]);
 
   // Stats for the home overview (using actual data where possible)
   const stats = [
-    { label: "CGPA", value: data?.cgpa || "9.2" },
-    { label: "Courses", value: "4" },
-    { label: "Applied Jobs", value: "12" },
-    { label: "Assessments", value: "2" }
+    { label: "CGPA", value: profile?.cgpa || "N/A" },
+    { label: "Courses", value: courses.length.toString() },
+    { label: "Drives", value: slots.length.toString() },
+    { label: "Offers", value: offers.length.toString() }
   ];
 
   const api = useMemo(() => {
@@ -37,7 +40,7 @@ export default function StudentDashboard({
     });
   }, [accessToken]);
 
-  const handleError = (err: any) => {
+  const handleError = (err) => {
     console.error("Student API Error:", err);
     if (err.response) {
       return `Server Error (${err.response.status}): ${err.response.data?.error || "Backend error"}`;
@@ -46,13 +49,27 @@ export default function StudentDashboard({
     return "Unexpected error occurred";
   };
 
-  const fetchData = async (apiCall: Promise<any>) => {
+  const fetchData = async (tab) => {
     try {
       setLoading(true);
       setError(null);
-      const res = await apiCall;
-      setData(res.data);
-    } catch (err: any) {
+      if (tab === "home" || tab === "profile") {
+        const res = await api.get("/profile");
+        setProfile(res.data);
+      } else if (tab === "courses") {
+        const res = await api.get("/courses/enrolled");
+        setCourses(res.data);
+      } else if (tab === "assessments") {
+        const res = await api.get("/assessments/upcoming");
+        setAssessments(res.data);
+      } else if (tab === "slots") {
+        const res = await api.get("/slots/available");
+        setSlots(res.data);
+      } else if (tab === "offers") {
+        const res = await api.get("/offers/eligible");
+        setOffers(res.data);
+      }
+    } catch (err) {
       setError(handleError(err));
     } finally {
       setLoading(false);
@@ -86,38 +103,31 @@ export default function StudentDashboard({
         <div className="content-card flex-2">
           <h3>Upcoming Assessments</h3>
           <div className="list-container">
-            <div className="list-item">
-              <div className="item-info">
-                <span className="item-title">Data Structures Midterm</span>
-                <span className="item-date">March 15, 2024</span>
+            {assessments.slice(0, 3).map((a, i) => (
+              <div key={i} className="list-item">
+                <div className="item-info">
+                  <span className="item-title">{a.title}</span>
+                  <span className="item-date">{new Date(a.deadline).toLocaleDateString()}</span>
+                </div>
+                <span className="status-badge pending">Upcoming</span>
               </div>
-              <span className="status-badge pending">Upcoming</span>
-            </div>
-            <div className="list-item">
-              <div className="item-info">
-                <span className="item-title">Web Dev Project</span>
-                <span className="item-date">March 20, 2024</span>
-              </div>
-              <span className="status-badge pending">Upcoming</span>
-            </div>
+            ))}
+            {assessments.length === 0 && <p>No upcoming assessments</p>}
           </div>
         </div>
 
         <div className="content-card flex-1">
-          <h3>Recent Applications</h3>
+          <h3>Recent Drive Registrations</h3>
           <div className="list-container">
-            <div className="list-item">
-              <div className="item-info">
-                <span className="item-title">Google SDE Intern</span>
+             {slots.filter(s => s.registration_id).slice(0, 3).map((s, i) => (
+              <div key={i} className="list-item">
+                <div className="item-info">
+                  <span className="item-title">{s.company_name}</span>
+                </div>
+                <span className={`status-badge ${s.status}`}>{s.status}</span>
               </div>
-              <span className="status-badge verified">Shortlisted</span>
-            </div>
-            <div className="list-item">
-              <div className="item-info">
-                <span className="item-title">Microsoft SDE-1</span>
-              </div>
-              <span className="status-badge pending">Under Review</span>
-            </div>
+            ))}
+            {slots.filter(s => s.registration_id).length === 0 && <p>No recent registrations</p>}
           </div>
         </div>
       </div>
@@ -133,31 +143,28 @@ export default function StudentDashboard({
 
   // Fetch data automatically on tab change or mount
   useEffect(() => {
-    if (activeTab === "profile" || activeTab === "home") {
-      fetchData(api.get("/profile"));
-    }
-    // For other tabs, we could also auto-fetch if needed
+    fetchData(activeTab);
   }, [activeTab]);
 
   // Update form when data is fetched
   useEffect(() => {
-    if (data) {
+    if (profile) {
       setProfileForm({
-        cgpa: data.cgpa || "",
-        department: data.department || "",
-        graduation_year: data.graduation_year || ""
+        cgpa: profile.cgpa || "",
+        department: profile.department || "",
+        graduation_year: profile.graduation_year || ""
       });
     }
-  }, [data]);
+  }, [profile]);
 
-  const handleProfileUpdate = async (e: React.FormEvent) => {
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
       const res = await api.put("/profile", profileForm);
-      setData(res.data);
+      setProfile(res.data);
       setIsEditing(false);
-    } catch (err: any) {
+    } catch (err) {
       setError(handleError(err));
     } finally {
       setLoading(false);
@@ -171,8 +178,8 @@ export default function StudentDashboard({
         <div className="profile-info">
           <h2>{user.user_metadata?.full_name || "Student Name"}</h2>
           <p>{user.email}</p>
-          <span className={`status-badge ${data?.is_verified ? 'verified' : 'pending'}`}>
-            {data?.is_verified ? 'Verified Student' : 'Verification Pending'}
+          <span className={`status-badge ${profile?.is_verified ? 'verified' : 'pending'}`}>
+            {profile?.is_verified ? 'Verified Student' : 'Verification Pending'}
           </span>
         </div>
         {!isEditing && (
@@ -223,7 +230,7 @@ export default function StudentDashboard({
             </div>
             <div className="detail-group">
               <label>Advisor Status</label>
-              <p>{data?.advisor_id ? "Assigned" : "Not Assigned"}</p>
+              <p>{profile?.advisor_id ? "Assigned" : "Not Assigned"}</p>
             </div>
           </div>
           <div className="action-row">
@@ -239,72 +246,74 @@ export default function StudentDashboard({
         <div className="profile-details-grid">
           <div className="detail-group">
             <label>Department</label>
-            <p>{data?.department || "Not Specified"}</p>
+            <p>{profile?.department || "Not Specified"}</p>
           </div>
           <div className="detail-group">
             <label>Batch</label>
-            <p>{data?.graduation_year || "Not Specified"}</p>
+            <p>{profile?.graduation_year || "Not Specified"}</p>
           </div>
           <div className="detail-group">
             <label>Current CGPA</label>
-            <p>{data?.cgpa || "Not Specified"}</p>
+            <p>{profile?.cgpa || "Not Specified"}</p>
           </div>
           <div className="detail-group">
             <label>Advisor</label>
-            <p>{data?.advisor_fname ? `${data.advisor_fname} ${data.advisor_lname}` : "Pending Assignment"}</p>
+            <p>{profile?.advisor_fname ? `${profile.advisor_fname} ${profile.advisor_lname}` : "Pending Assignment"}</p>
           </div>
         </div>
       )}
 
-      {data && <pre className="debug-data">{JSON.stringify(data, null, 2)}</pre>}
+      {profile && <pre className="debug-data">{JSON.stringify(profile, null, 2)}</pre>}
     </section>
   );
 
   const renderCourses = () => (
     <section className="content-card">
       <div className="tab-header">
-        <button className="btn btn-primary" onClick={() => fetchData(api.get("/courses/enrolled"))}>My Enrolled Courses</button>
-        <button className="btn btn-secondary" onClick={() => fetchData(api.get("/courses/available"))}>Available Courses</button>
+        <button className="btn btn-primary" onClick={() => fetchData("courses")}>My Enrolled Courses</button>
+        <button className="btn btn-secondary" onClick={() => api.get("/courses/available").then(res => setCourses(res.data))}>Available Courses</button>
       </div>
       
       <div className="table-responsive">
         <table className="data-table">
           <thead>
             <tr>
-              <th>Course Code</th>
               <th>Course Name</th>
               <th>Instructor</th>
-              <th>Credits</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>CS301</td>
-              <td>Data Structures</td>
-              <td>Dr. Sarah Johnson</td>
-              <td>4</td>
-              <td><button className="btn btn-secondary">View Materials</button></td>
-            </tr>
-            <tr>
-              <td>CS302</td>
-              <td>Web Technology</td>
-              <td>Prof. Michael Chen</td>
-              <td>3</td>
-              <td><button className="btn btn-secondary">View Materials</button></td>
-            </tr>
+            {courses.length === 0 ? <tr><td colSpan={3} style={{textAlign:'center'}}>No courses found</td></tr> : 
+              courses.map((course) => (
+                <tr key={course.course_id}>
+                  <td>{course.name}</td>
+                  <td>{course.fname} {course.lname}</td>
+                  <td>
+                    {activeTab === 'courses' ? (
+                      <button className="btn btn-secondary btn-sm">View Materials</button>
+                    ) : (
+                      <button className="btn btn-primary btn-sm" onClick={async () => {
+                        await api.post("/courses/enroll", { courseId: course.course_id });
+                        alert("Enrolled successfully!");
+                        fetchData("courses");
+                      }}>Enroll</button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            }
           </tbody>
         </table>
       </div>
-      {data && <pre className="debug-data">{JSON.stringify(data, null, 2)}</pre>}
     </section>
   );
 
   const renderAssessments = () => (
     <section className="content-card">
       <div className="tab-header">
-        <button className="btn btn-primary" onClick={() => fetchData(api.get("/assessments/upcoming"))}>Upcoming Tests</button>
-        <button className="btn btn-secondary">History</button>
+        <button className="btn btn-primary" onClick={() => fetchData("assessments")}>Upcoming Tests</button>
+        <button className="btn btn-secondary" onClick={() => api.get("/assessments/history").then(res => setAssessments(res.data))}>History</button>
       </div>
       
       <div className="table-responsive">
@@ -312,34 +321,31 @@ export default function StudentDashboard({
           <thead>
             <tr>
               <th>Topic</th>
-              <th>Date</th>
-              <th>Duration</th>
-              <th>Max Marks</th>
-              <th>Status</th>
+              <th>Course</th>
+              <th>Deadline</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>Algorithm Analysis</td>
-              <td>March 15, 2024</td>
-              <td>60 min</td>
-              <td>100</td>
-              <td><span className="status-badge pending">Upcoming</span></td>
-              <td><button className="btn btn-primary">Start Test</button></td>
-            </tr>
-            <tr>
-              <td>CSS Grid & Flexbox</td>
-              <td>March 20, 2024</td>
-              <td>45 min</td>
-              <td>50</td>
-              <td><span className="status-badge pending">Not Started</span></td>
-              <td><button className="btn btn-secondary" onClick={() => fetchData(api.post("/assessments/submit", { assessmentId: 1, submissionUrl: "http://test.com" }))}>Submit Project</button></td>
-            </tr>
+            {assessments.length === 0 ? <tr><td colSpan={4} style={{textAlign:'center'}}>No assessments found</td></tr> : 
+              assessments.map((a) => (
+                <tr key={a.assessment_id}>
+                  <td>{a.title}</td>
+                  <td>{a.course_name}</td>
+                  <td>{new Date(a.deadline).toLocaleString()}</td>
+                  <td>
+                    {a.score !== undefined && a.score !== null ? (
+                      <span>Score: {a.score}</span>
+                    ) : (
+                      <button className="btn btn-primary btn-sm">Start Test</button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            }
           </tbody>
         </table>
       </div>
-      {data && <pre className="debug-data">{JSON.stringify(data, null, 2)}</pre>}
     </section>
   );
 
@@ -348,8 +354,8 @@ export default function StudentDashboard({
       <div className="tab-header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
         <h3>Available Placement Drives</h3>
         <div className="tab-actions">
-           <button className="btn btn-primary" onClick={() => fetchData(api.get("/slots/available"))}>Refresh Available</button>
-           <button className="btn btn-secondary" onClick={() => fetchData(api.get("/slots/my"))}>My Registrations</button>
+           <button className="btn btn-primary" onClick={() => fetchData("slots")}>Refresh Available</button>
+           <button className="btn btn-secondary" onClick={() => api.get("/slots/my").then(res => setSlots(res.data))}>My Registrations</button>
         </div>
       </div>
       
@@ -368,29 +374,29 @@ export default function StudentDashboard({
             </tr>
           </thead>
           <tbody>
-            {!data || !Array.isArray(data) || data.length === 0 ? (
+            {slots.length === 0 ? (
               <tr><td colSpan={6} style={{textAlign:'center', padding:'2rem'}}>No drives found for this category</td></tr>
             ) : (
-              data.map((drive: any) => (
+              slots.map((drive) => (
                 <tr key={drive.drive_id}>
                   <td><strong>{drive.company_name || 'TBA'}</strong></td>
                   <td>{new Date(drive.drive_date).toLocaleDateString()}</td>
                   <td>{drive.drive_type?.toUpperCase()}</td>
                   <td>{drive.mode?.toUpperCase()}</td>
                   <td>
-                    <span className={`status-badge ${drive.status || 'registered'}`}>
+                    <span className={`status-badge ${drive.status || 'available'}`}>
                       {drive.status || 'Available'}
                     </span>
                   </td>
                   <td>
-                    {activeTab === 'slots' && !drive.registration_id ? (
+                    {!drive.registration_id ? (
                       <button 
                         className="btn btn-primary btn-sm" 
                         onClick={async () => {
                           try {
                             await api.post("/slots/book", { driveId: drive.drive_id });
                             alert("Successfully applied for the drive!");
-                            fetchData(api.get("/slots/available"));
+                            fetchData("slots");
                           } catch (err) {
                             alert("Failed to apply");
                           }
@@ -414,8 +420,8 @@ export default function StudentDashboard({
   const renderOffers = () => (
     <section className="content-card">
       <div className="tab-header">
-        <button className="btn btn-primary" onClick={() => fetchData(api.get("/offers/eligible"))}>View Eligible Drives</button>
-        <button className="btn btn-secondary">Applied Drives</button>
+        <button className="btn btn-primary" onClick={() => fetchData("offers")}>View Eligible Offers</button>
+        <button className="btn btn-secondary" onClick={() => api.get("/offers/applications").then(res => setOffers(res.data))}>My Applications</button>
       </div>
 
       <div className="table-responsive">
@@ -430,24 +436,41 @@ export default function StudentDashboard({
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td>TechCorp Systems</td>
-              <td>Full Stack Developer</td>
-              <td>12 LPA</td>
-              <td>March 10, 2024</td>
-              <td><button className="btn btn-primary" onClick={() => fetchData(api.post("/offers/apply", { offerId: 1 }))}>Apply Now</button></td>
-            </tr>
-            <tr>
-              <td>DataWorks Inc.</td>
-              <td>Data Analyst</td>
-              <td>10 LPA</td>
-              <td>March 12, 2024</td>
-              <td><button className="btn btn-primary" onClick={() => fetchData(api.post("/offers/apply", { offerId: 2 }))}>Apply Now</button></td>
-            </tr>
+            {offers.length === 0 ? (
+              <tr><td colSpan={5} style={{textAlign:'center', padding:'2rem'}}>No offers found in this category</td></tr>
+            ) : (
+              offers.map((offer) => (
+                <tr key={offer.offer_id || offer.application_id}>
+                  <td><strong>{offer.fname} {offer.lname}</strong></td>
+                  <td>{offer.title}</td>
+                  <td>{offer.package_lpa} LPA</td>
+                  <td>{new Date(offer.acceptance_deadline || offer.applied_at).toLocaleDateString()}</td>
+                  <td>
+                    {offer.application_id ? (
+                      <span className={`status-badge ${offer.status}`}>{offer.status.toUpperCase()}</span>
+                    ) : (
+                      <button 
+                        className="btn btn-primary btn-sm" 
+                        onClick={async () => {
+                          try {
+                            await api.post("/offers/apply", { offerId: offer.offer_id });
+                            alert("Applied successfully!");
+                            fetchData("offers");
+                          } catch (err) {
+                            alert("Failed to apply");
+                          }
+                        }}
+                      >
+                        Apply Now
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
-      {data && <pre className="debug-data">{JSON.stringify(data, null, 2)}</pre>}
     </section>
   );
 
@@ -509,7 +532,7 @@ export default function StudentDashboard({
           user={user} 
           role="student" 
           accessToken={accessToken} 
-          onComplete={() => fetchData(api.get("/profile"))} 
+          onComplete={() => fetchData("profile")} 
         />
       )}
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import '../styles/Dashboard.css';
 
-export default function AlumniDashboard({ user }: { user: any }) {
+export default function AlumniDashboard({ user }) {
   const [activeTab, setActiveTab] = useState('network');
 
   const sidebarItems = [

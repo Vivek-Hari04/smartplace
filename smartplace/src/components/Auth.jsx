@@ -3,11 +3,7 @@ import Login from './Login';
 import Register from './Register';
 import '../styles/Auth.css';
 
-type AuthProps = {
-  onBack?: () => void;
-};
-
-export default function Auth({ onBack }: AuthProps) {
+export default function Auth({ onBack }) {
   const [isLogin, setIsLogin] = useState(true);
 
   const handleBack = () => {

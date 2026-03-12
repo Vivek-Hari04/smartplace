@@ -43,6 +43,50 @@ exports.assignAdvisor = async (studentId, advisorId) => {
 
 /* SYSTEM OVERSIGHT */
 
+exports.getPendingDrives = async () => {
+  const result = await pool.query(
+    `SELECT pd.*, COALESCE(c.company_name, u.fname || ' ' || u.lname) as company_name 
+     FROM placement_drives pd
+     LEFT JOIN companies c ON pd.company_id = c.user_id
+     LEFT JOIN users u ON pd.company_id = u.user_id
+     WHERE pd.status = 'PENDING'
+     ORDER BY pd.drive_date ASC`
+  );
+  return result.rows;
+};
+
+exports.updateDriveStatus = async (driveId, status) => {
+  const result = await pool.query(
+    "UPDATE placement_drives SET status = $1 WHERE drive_id = $2 RETURNING *",
+    [status, driveId]
+  );
+  if (!result.rowCount) throw new Error("Drive not found");
+  return result.rows[0];
+};
+
+exports.getAllDrives = async () => {
+  const result = await pool.query(
+    `SELECT pd.*, COALESCE(c.company_name, u.fname || ' ' || u.lname) as company_name 
+     FROM placement_drives pd
+     LEFT JOIN companies c ON pd.company_id = c.user_id
+     LEFT JOIN users u ON pd.company_id = u.user_id
+     ORDER BY pd.drive_date DESC`
+  );
+  return result.rows;
+};
+
+exports.getDriveRegistrants = async (driveId) => {
+  const result = await pool.query(
+    `SELECT dr.*, u.fname, u.lname, u.email, s.department, s.cgpa
+     FROM drive_registrations dr
+     JOIN users u ON dr.student_id = u.user_id
+     JOIN students s ON u.user_id = s.user_id
+     WHERE dr.drive_id = $1`,
+    [driveId]
+  );
+  return result.rows;
+};
+
 exports.getStats = async () => {
   const queries = {
     totalStudents: "SELECT COUNT(*) FROM students",

@@ -1,20 +1,6 @@
 import { supabase } from '../../lib/supabase';
 
-interface SidebarItem {
-  id: string;
-  label: string;
-  icon?: string; // Optional icon for future
-}
-
-interface SidebarProps {
-  user: any;
-  items: SidebarItem[];
-  activeItem: string;
-  onItemClick: (id: string) => void;
-  title?: string;
-}
-
-export default function Sidebar({ user, items, activeItem, onItemClick, title = 'SmartPlace' }: SidebarProps) {
+export default function Sidebar({ user, items, activeItem, onItemClick, title = 'SmartPlace' }) {
   const handleLogout = async () => {
     await supabase.auth.signOut();
   };

@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
 import './styles/HomePage.css';
 
-export default function HomePage({ onEnter }: { onEnter: () => void }) {
+export default function HomePage({ onEnter }) {
   const [scrolled, setScrolled] = useState(false);
-  const [activeFaq, setActiveFaq] = useState<number | null>(null);
+  const [activeFaq, setActiveFaq] = useState(null);
 
   useEffect(() => {
     const handleScroll = () => {

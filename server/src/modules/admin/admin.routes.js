@@ -20,4 +20,10 @@ router.get("/stats", adminController.getStats);
 router.get("/courses", adminController.getAllCourses);
 router.get("/faculty", adminController.getFacultyList);
 
+/* PLACEMENT DRIVE APPROVALS */
+router.get("/drives/pending", adminController.getPendingDrives);
+router.get("/drives", adminController.getAllDrives);
+router.get("/drives/:driveId/registrants", adminController.getDriveRegistrants);
+router.patch("/drives/:id/status", adminController.updateDriveStatus);
+
 module.exports = router;

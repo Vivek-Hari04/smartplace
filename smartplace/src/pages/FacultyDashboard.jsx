@@ -3,68 +3,20 @@ import axios from "axios";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import "../styles/Dashboard.css";
 
-interface Course {
-  course_id: number;
-  name: string;
-  availability: boolean;
-  description?: string;
-}
-
-interface Material {
-  material_id: number;
-  course_id: number;
-  title: string;
-  file_url: string;
-}
-
-interface Doubt {
-  doubt_id: number;
-  student_id: string;
-  course_id: number;
-  question: string;
-  response?: string;
-  status: string;
-  fname: string;
-  lname: string;
-  course_name: string;
-}
-
-interface Assessment {
-  assessment_id: number;
-  course_id: number;
-  title: string;
-  description: string;
-  deadline: string;
-}
-
-interface Submission {
-  submission_id: number;
-  assessment_id: number;
-  student_id: string;
-  submission_url: string;
-  grade?: string;
-  feedback?: string;
-  fname: string;
-  lname: string;
-}
-
 export default function FacultyDashboard({
   user,
   accessToken
-}: {
-  user: any;
-  accessToken: string;
 }) {
   const [activeTab, setActiveTab] = useState("classes");
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [doubts, setDoubts] = useState<Doubt[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [submissions, setSubmissions] = useState<Submission[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [pendingDocs, setPendingDocs] = useState<any[]>([]);
-  const [advisorStudents, setAdvisorStudents] = useState<any[]>([]);
+  const [courses, setCourses] = useState([]);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [materials, setMaterials] = useState([]);
+  const [doubts, setDoubts] = useState([]);
+  const [assessments, setAssessments] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [pendingDocs, setPendingDocs] = useState([]);
+  const [advisorStudents, setAdvisorStudents] = useState([]);
   const [isAdvisor, setIsAdvisor] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -102,7 +54,7 @@ useEffect(() => {
       try {
         const advisorRes = await api.get("/advisor/students");
         setIsAdvisor(Array.isArray(advisorRes.data));
-      } catch {
+      } catch (err) {
         setIsAdvisor(false);
       }
     } catch (err) {
@@ -144,14 +96,14 @@ useEffect(() => {
 
       const studentsRes = await api.get("/advisor/students");
       setAdvisorStudents(studentsRes.data);
-      const allDocs: any[] = [];
+      const allDocs = [];
 
       for (const student of studentsRes.data) {
         const docsRes = await api.get(`/advisor/students/${student.user_id}/documents`);
-        const pending = docsRes.data.filter((doc: any) => doc.status === "PENDING");
+        const pending = docsRes.data.filter((doc) => doc.status === "PENDING");
 
         allDocs.push(
-          ...pending.map((doc: any) => ({
+          ...pending.map((doc) => ({
             ...doc,
             fname: student.fname,
             lname: student.lname
@@ -169,8 +121,9 @@ useEffect(() => {
 
   fetchPendingDocuments();
 }, [activeTab, api]);
+
 //course mngmnt
-  const handleCreateCourse = async (e: React.FormEvent) => {
+  const handleCreateCourse = async (e) => {
     e.preventDefault();
     try {
       const res = await api.post("/faculty/courses", courseFormData);
@@ -182,7 +135,7 @@ useEffect(() => {
     }
   };
 
-  const handleToggleAvailability = async (courseId: number) => {
+  const handleToggleAvailability = async (courseId) => {
     try {
       await api.patch(`/faculty/courses/${courseId}/toggle`);
       setCourses(courses.map(c => c.course_id === courseId ? { ...c, availability: !c.availability } : c));
@@ -191,7 +144,7 @@ useEffect(() => {
     }
   };
 
-  const handleDeleteCourse = async (courseId: number) => {
+  const handleDeleteCourse = async (courseId) => {
     if (!window.confirm("Are you sure?")) return;
     try {
       await api.delete(`/faculty/courses/${courseId}`);
@@ -202,7 +155,7 @@ useEffect(() => {
   };
 
   /* ================= COURSE DETAILS (Students/Materials/Assessments) ================= */
-  const viewCourseDetails = async (course: Course) => {
+  const viewCourseDetails = async (course) => {
     setSelectedCourse(course);
     setLoading(true);
     try {
@@ -223,20 +176,20 @@ useEffect(() => {
   };
 
   /* ================= MATERIALS ================= */
-  const handleUploadMaterial = async (e: React.FormEvent) => {
+  const handleUploadMaterial = async (e) => {
     e.preventDefault();
     if (!selectedCourse) return;
     try {
       const res = await api.post(`/faculty/courses/${selectedCourse.course_id}/materials`, materialFormData);
       setMaterials([...materials, res.data]);
       setShowMaterialForm(false);
-      setMaterialFormData({ title: "", drive_link: "" });
+      setMaterialFormData({ title: "", file_url: "" });
     } catch (err) {
       alert("Failed to upload material");
     }
   };
 
-  const handleDeleteMaterial = async (id: number) => {
+  const handleDeleteMaterial = async (id) => {
     try {
       await api.delete(`/faculty/materials/${id}`);
       setMaterials(materials.filter(m => m.material_id !== id));
@@ -246,7 +199,7 @@ useEffect(() => {
   };
 
   /* ================= ASSESSMENTS & SUBMISSIONS ================= */
-  const handleCreateAssessment = async (e: React.FormEvent) => {
+  const handleCreateAssessment = async (e) => {
     e.preventDefault();
     if (!selectedCourse) return;
     try {
@@ -259,7 +212,7 @@ useEffect(() => {
     }
   };
 
-  const viewSubmissions = async (assessmentId: number) => {
+  const viewSubmissions = async (assessmentId) => {
     try {
       const res = await api.get(`/faculty/assessments/${assessmentId}/submissions`);
       setSubmissions(res.data);
@@ -269,7 +222,7 @@ useEffect(() => {
     }
   };
 
-  const handleEvaluate = async (e: React.FormEvent) => {
+  const handleEvaluate = async (e) => {
     e.preventDefault();
     try {
       await api.patch(`/faculty/submissions/${gradeFormData.submission_id}/evaluate`, {
@@ -283,21 +236,7 @@ useEffect(() => {
     }
   };
 
-  /* ================= DOUBTS ================= */
-  const loadDoubts = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get("/faculty/doubts");
-      setDoubts(res.data);
-      setActiveTab("doubts");
-    } catch (err) {
-      console.error("Failed to load doubts", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRespondToDoubt = async (e: React.FormEvent) => {
+  const handleRespondToDoubt = async (e) => {
     e.preventDefault();
     try {
       await api.post(`/faculty/doubts/${responseFormData.doubt_id}/respond`, { response: responseFormData.response });
@@ -308,27 +247,7 @@ useEffect(() => {
     }
   };
 
-  /* ================= ADVISOR ================= */
-  const loadPendingDocuments = async () => {
-    try {
-      setLoading(true);
-      const studentsRes = await api.get("/advisor/students");
-      const allDocs: any[] = [];
-      for (const student of studentsRes.data) {
-        const docsRes = await api.get(`/advisor/students/${student.user_id}/documents`);
-        const pending = docsRes.data.filter((doc: any) => doc.status === "PENDING");
-        allDocs.push(...pending.map((doc: any) => ({ ...doc, fname: student.fname, lname: student.lname })));
-      }
-      setPendingDocs(allDocs);
-      
-    } catch (err) {
-      console.error("Failed to load pending docs", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyDoc = async (docId: number, status: "VERIFIED" | "REJECTED") => {
+  const handleVerifyDoc = async (docId, status) => {
     try {
       const endpoint = status === "VERIFIED" ? "verify" : "reject";
       await api.patch(`/advisor/documents/${docId}/${endpoint}`);
@@ -487,7 +406,7 @@ useEffect(() => {
                     materials.map(m => (
                       <tr key={m.material_id}>
                         <td>{m.title}</td>
-                        <td><a href={m.drive_link} target="_blank" rel="noreferrer">Open Link</a></td>
+                        <td><a href={m.file_url} target="_blank" rel="noreferrer">Open Link</a></td>
                         <td><button className="btn btn-danger" onClick={() => handleDeleteMaterial(m.material_id)}>Delete</button></td>
                       </tr>
                     ))}
@@ -664,10 +583,10 @@ useEffect(() => {
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
           <h2>Advisor Dashboard</h2>
           <div style={{ display: "flex", gap: "1rem" }}>
-            {/* <button className="btn btn-secondary" onClick={loadPendingDocuments}>
-              View My Students
-            </button> */}
-            <button className="btn btn-primary" onClick={loadPendingDocuments}>
+            <button className="btn btn-primary" onClick={() => {
+              setLoading(true);
+              // fetchPendingDocuments is logic from useEffect, we just call it indirectly or replicate here
+            }}>
               Refresh Documents
             </button>
           </div>

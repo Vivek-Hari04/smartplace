@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase'
 
-export default function NavBar({ user }: { user: any }) {
+export default function NavBar({ user }) {
   const handleLogout = () => supabase.auth.signOut();
 
   return (

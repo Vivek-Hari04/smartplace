@@ -1,15 +1,6 @@
 import React from 'react';
 import Sidebar from './Sidebar';
 
-interface DashboardLayoutProps {
-  children: React.ReactNode;
-  user: any;
-  sidebarItems: { id: string; label: string }[];
-  activeItem: string;
-  onSidebarChange: (id: string) => void;
-  title?: string;
-}
-
 export default function DashboardLayout({ 
   children, 
   user, 
@@ -17,7 +8,7 @@ export default function DashboardLayout({
   activeItem, 
   onSidebarChange,
   title
-}: DashboardLayoutProps) {
+}) {
   return (
     <div className="layout-container">
       <Sidebar 

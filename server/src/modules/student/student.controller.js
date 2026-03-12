@@ -263,6 +263,15 @@ async function getMyBookedSlots(req, res) {
   }
 }
 
+async function getDriveStatus(req, res) {
+  try {
+    const data = await studentService.getDriveStatus(req.user.id);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 /* =========================
    OFFERS
 ========================= */
@@ -285,6 +294,9 @@ async function applyForOffer(req, res) {
     );
     res.status(201).json(data);
   } catch (err) {
+    if (err.message === "You are not selected for this drive") {
+      return res.status(403).json({ error: err.message });
+    }
     res.status(400).json({ error: err.message });
   }
 }
@@ -355,6 +367,7 @@ module.exports = {
   bookSlot,
   cancelSlot,
   getMyBookedSlots,
+  getDriveStatus,
   getEligibleOffers,
   applyForOffer,
   getMyApplications,

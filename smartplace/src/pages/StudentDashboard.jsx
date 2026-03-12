@@ -20,6 +20,7 @@ export default function StudentDashboard({
   const [offers, setOffers] = useState([]);
   const [eligibleDrives, setEligibleDrives] = useState([]);
   const [driveEligibilityList, setDriveEligibilityList] = useState([]);
+  const [driveStatus, setDriveStatus] = useState([]);
 
   const [courseTab, setCourseTab] = useState("enrolled");
   const [isMaterialsModalOpen, setIsMaterialsModalOpen] = useState(false);
@@ -83,6 +84,9 @@ export default function StudentDashboard({
       } else if (tab === "drive-eligibility") {
         const res = await api.get("/drive-eligibility");
         setDriveEligibilityList(res.data);
+      } else if (tab === "drive-results") {
+        const res = await api.get("/drives/status");
+        setDriveStatus(res.data);
       } else if (tab === "offers") {
         const res = await api.get("/offers/eligible");
         setOffers(res.data);
@@ -102,57 +106,74 @@ export default function StudentDashboard({
     { id: "slots", label: "Placement Slots" },
     { id: "eligible-drives", label: "Eligible Drives" },
     { id: "drive-eligibility", label: "Drive Eligibility" },
+    { id: "drive-results", label: "Drive Results" },
     { id: "offers", label: "Job Offers" },
     { id: "documents", label: "Documents" }
   ];
 
-  const renderHome = () => (
-    <div className="dashboard-grid">
-      <div className="stats-container">
-        {stats.map((stat, index) => (
-          <div key={index} className="stat-card">
-            <div className="stat-info">
-              <span className="stat-label">{stat.label}</span>
-              <span className="stat-value">{stat.value}</span>
-            </div>
-          </div>
-        ))}
+  const renderHome = () => {
+    const unappliedSelectedDrives = driveStatus.filter(d => d.status === 'selected').length > offers.filter(o => o.application_id).length;
+
+    return (
+    <div className="home-dashboard">
+      <div className="welcome-banner">
+        <h1>Welcome back, {profile?.fname || "Student"}!</h1>
+        <p>Here's what's happening with your placements and courses today.</p>
       </div>
 
-      <div className="content-row">
-        <div className="content-card flex-2">
-          <h3>Upcoming Assessments</h3>
-          <div className="list-container">
-            {assessments.slice(0, 3).map((a, i) => (
-              <div key={i} className="list-item">
-                <div className="item-info">
-                  <span className="item-title">{a.title}</span>
-                  <span className="item-date">{new Date(a.deadline).toLocaleDateString()}</span>
-                </div>
-                <span className="status-badge pending">Upcoming</span>
+      {unappliedSelectedDrives && (
+        <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid #a7f3d0' }}>
+          <strong>🎉 Congratulations!</strong> You have been selected for a drive. <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab("offers"); }} style={{ color: '#047857', fontWeight: 'bold', textDecoration: 'underline' }}>View your job offer.</a>
+        </div>
+      )}
+      <div className="dashboard-grid">
+        <div className="stats-container">
+          {stats.map((stat, index) => (
+            <div key={index} className="stat-card">
+              <div className="stat-info">
+                <span className="stat-label">{stat.label}</span>
+                <span className="stat-value">{stat.value}</span>
               </div>
-            ))}
-            {assessments.length === 0 && <p>No upcoming assessments</p>}
-          </div>
+            </div>
+          ))}
         </div>
 
-        <div className="content-card flex-1">
-          <h3>Recent Drive Registrations</h3>
-          <div className="list-container">
-            {slots.filter(s => s.registration_id).slice(0, 3).map((s, i) => (
-              <div key={i} className="list-item">
-                <div className="item-info">
-                  <span className="item-title">{s.company_name}</span>
+        <div className="content-row">
+          <div className="content-card flex-2">
+            <h3>Upcoming Assessments</h3>
+            <div className="list-container">
+              {assessments.slice(0, 3).map((a, i) => (
+                <div key={i} className="list-item">
+                  <div className="item-info">
+                    <span className="item-title">{a.title}</span>
+                    <span className="item-date">{new Date(a.deadline).toLocaleDateString()}</span>
+                  </div>
+                  <span className="status-badge pending">Upcoming</span>
                 </div>
-                <span className={`status-badge ${s.status}`}>{s.status}</span>
-              </div>
-            ))}
-            {slots.filter(s => s.registration_id).length === 0 && <p>No recent registrations</p>}
+              ))}
+              {assessments.length === 0 && <p>No upcoming assessments</p>}
+            </div>
+          </div>
+
+          <div className="content-card flex-1">
+            <h3>Recent Drive Registrations</h3>
+            <div className="list-container">
+              {slots.filter(s => s.registration_id).slice(0, 3).map((s, i) => (
+                <div key={i} className="list-item">
+                  <div className="item-info">
+                    <span className="item-title">{s.company_name}</span>
+                  </div>
+                  <span className={`status-badge ${s.status}`}>{s.status}</span>
+                </div>
+              ))}
+              {slots.filter(s => s.registration_id).length === 0 && <p>No recent registrations</p>}
+            </div>
           </div>
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const [isEditing, setIsEditing] = useState(false);
   const [profileForm, setProfileForm] = useState({
@@ -586,6 +607,65 @@ export default function StudentDashboard({
     </section>
   );
 
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'registered': return '#6b7280'; // gray
+      case 'shortlisted': return '#3b82f6'; // blue
+      case 'selected': return '#16a34a'; // green
+      case 'rejected': return '#dc2626'; // red
+      default: return '#6b7280';
+    }
+  };
+
+  const renderDriveStatus = () => (
+    <section className="content-card">
+      <div className="tab-header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+        <h3>Drive Results</h3>
+        <button className="btn btn-primary" onClick={() => fetchData("drive-results")}>Refresh</button>
+      </div>
+
+      <div className="table-responsive">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Drive Date</th>
+              <th>Type</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {driveStatus.length === 0 ? (
+              <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>No drive results found</td></tr>
+            ) : (
+              driveStatus.map((drive) => (
+                <tr key={drive.drive_id}>
+                  <td><strong>{drive.company_name || 'TBA'}</strong></td>
+                  <td>{new Date(drive.drive_date).toLocaleDateString()}</td>
+                  <td>{drive.drive_type?.toUpperCase()}</td>
+                  <td>
+                    <span 
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        color: 'white',
+                        fontWeight: 'bold',
+                        fontSize: '0.85rem',
+                        backgroundColor: getStatusColor(drive.status)
+                      }}
+                    >
+                      {drive.status?.toUpperCase() || 'UNKNOWN'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+
   const renderOffers = () => (
     <section className="content-card">
       <div className="tab-header">
@@ -626,7 +706,7 @@ export default function StudentDashboard({
                             alert("Applied successfully!");
                             fetchData("offers");
                           } catch (err) {
-                            alert("Failed to apply");
+                            alert(err.response?.data?.error || "Failed to apply");
                           }
                         }}
                       >
@@ -788,6 +868,7 @@ export default function StudentDashboard({
         {activeTab === "slots" && renderSlots()}
         {activeTab === "eligible-drives" && renderEligibleDrives()}
         {activeTab === "drive-eligibility" && renderDriveEligibility()}
+        {activeTab === "drive-results" && renderDriveStatus()}
         {activeTab === "offers" && renderOffers()}
         {activeTab === "documents" && renderDocuments()}
       </div>

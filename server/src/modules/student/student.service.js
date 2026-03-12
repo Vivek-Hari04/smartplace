@@ -404,19 +404,38 @@ async function getEligibleOffers(studentId) {
     `SELECT po.*, u.fname, u.lname
      FROM placement_offers po
      JOIN users u ON po.company_id = u.user_id
+     JOIN drive_registrations dr ON po.drive_id = dr.drive_id
      WHERE po.acceptance_deadline >= CURRENT_DATE
-       AND po.drive_id IN (
-         SELECT drive_id
-         FROM drive_registrations
-         WHERE student_id = $1
-           AND status = 'selected'
-       )`,
+       AND dr.student_id = $1
+       AND dr.status = 'selected'`,
     [studentId]
   );
   return result.rows;
 }
 
 async function applyForOffer(studentId, offerId) {
+  // 1. Fetch the offer to get its drive_id
+  const offerRes = await pool.query(
+    `SELECT drive_id FROM placement_offers WHERE offer_id = $1`,
+    [offerId]
+  );
+
+  if (offerRes.rows.length === 0) {
+    throw new Error("Offer not found");
+  }
+
+  const driveId = offerRes.rows[0].drive_id;
+
+  // 2. Check student's registry status
+  const regRes = await pool.query(
+    `SELECT status FROM drive_registrations WHERE student_id = $1 AND drive_id = $2`,
+    [studentId, driveId]
+  );
+
+  if (regRes.rows.length === 0 || regRes.rows[0].status !== 'selected') {
+    throw new Error("You are not selected for this drive");
+  }
+
   const result = await pool.query(
     `INSERT INTO offer_applications (offer_id, student_id)
      VALUES ($1, $2)
@@ -474,6 +493,24 @@ async function getOfferHistory(studentId) {
   return result.rows;
 }
 
+async function getDriveStatus(studentId) {
+  const result = await pool.query(
+    `SELECT
+       d.drive_id,
+       d.drive_date,
+       d.drive_type,
+       c.company_name,
+       r.status
+     FROM drive_registrations r
+     JOIN placement_drives d ON d.drive_id = r.drive_id
+     JOIN companies c ON c.user_id = d.company_id
+     WHERE r.student_id = $1
+     ORDER BY d.drive_date DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
 module.exports = {
   getStudentProfile,
   getStaffAdvisors,
@@ -497,6 +534,7 @@ module.exports = {
   bookSlot,
   cancelSlot,
   getMyBookedSlots,
+  getDriveStatus,
   getEligibleOffers,
   applyForOffer,
   getMyApplications,

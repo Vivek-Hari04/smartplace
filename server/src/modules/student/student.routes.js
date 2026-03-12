@@ -150,6 +150,12 @@ router.get(
   studentController.getMyBookedSlots
 );
 
+router.get(
+  "/drives/status",
+  authMiddleware,
+  studentController.getDriveStatus
+);
+
 /* =========================
    OFFERS
 ========================= */

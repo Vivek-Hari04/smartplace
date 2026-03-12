@@ -244,3 +244,16 @@ exports.generateReport = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.deleteAssessment = async (req, res, next) => {
+  try {
+    const facultyId = req.user.user_id || req.user.id;
+    const { id: assessmentId } = req.params;
+
+    await facultyService.deleteAssessment(facultyId, assessmentId);
+
+    res.json({ message: "Assessment deleted" });
+  } catch (err) {
+    next(err);
+  }
+};

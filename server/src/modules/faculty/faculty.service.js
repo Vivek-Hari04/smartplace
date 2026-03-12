@@ -415,3 +415,26 @@ exports.generateReport = async (facultyId, assessmentId) => {
     average_marks: row.average_marks != null ? Number(row.average_marks) : null,
   };
 };
+
+exports.deleteAssessment = async (facultyId, assessmentId) => {
+  const verifyQuery = `
+    SELECT a.assessment_id 
+    FROM assessments a
+    JOIN courses c ON a.course_id = c.course_id
+    WHERE a.assessment_id = $1 
+      AND c.faculty_id = $2
+  `;
+
+  const verify = await pool.query(verifyQuery, [assessmentId, facultyId]);
+
+  if (!verify.rowCount) {
+    const err = new Error("Unauthorized");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  await pool.query(
+    `DELETE FROM assessments WHERE assessment_id = $1`,
+    [assessmentId]
+  );
+};

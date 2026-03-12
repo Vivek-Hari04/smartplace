@@ -124,9 +124,10 @@ async function getAssessmentDetails(req, res) {
 
 async function startAssessment(req, res) {
   try {
+    const studentId = req.user.user_id || req.user.id;
     const { assessmentId } = req.params;
     const data = await studentService.startAssessment(
-      req.user.id,
+      studentId,
       assessmentId
     );
     res.status(200).json(data);
@@ -160,7 +161,8 @@ async function getAssessmentResults(req, res) {
 
 async function getAssessmentHistory(req, res) {
   try {
-    const data = await studentService.getAssessmentHistory(req.user.id);
+    const studentId = req.user.user_id || req.user.id;
+    const data = await studentService.getAssessmentHistory(studentId);
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });

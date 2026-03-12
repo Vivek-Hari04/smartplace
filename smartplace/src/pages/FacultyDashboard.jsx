@@ -445,7 +445,27 @@ useEffect(() => {
                       <tr key={a.assessment_id}>
                         <td>{a.title}</td>
                         <td>{new Date(a.deadline).toLocaleDateString()}</td>
-                        <td><button className="btn btn-secondary" onClick={() => viewSubmissions(a.assessment_id)}>View Submissions</button></td>
+                        <td style={{ display: "flex", gap: "0.5rem" }}>
+                          <button className="btn btn-secondary" onClick={() => viewSubmissions(a.assessment_id)}>View Submissions</button>
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={async () => {
+                              if (!window.confirm("Delete this assessment? This will also delete all student submissions.")) return;
+
+                              try {
+                                await api.delete(`/faculty/assessments/${a.assessment_id}`);
+                                alert("Assessment deleted");
+                                
+                                // Re-fetch by calling viewCourseDetails
+                                viewCourseDetails(selectedCourse);
+                              } catch (err) {
+                                alert("Delete failed");
+                              }
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                 </tbody>

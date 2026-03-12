@@ -4,9 +4,49 @@ const pool = require("../../config/db");
 
 exports.getAllUsers = async () => {
   const result = await pool.query(
-    "SELECT user_id, fname, lname, email, role, created_at FROM users ORDER BY created_at DESC"
+    `SELECT u.user_id, u.fname, u.lname, u.email, u.role, u.is_verified, u.created_at, ur.reason as rejection_reason
+     FROM users u
+     LEFT JOIN user_rejections ur ON u.user_id = ur.user_id
+     ORDER BY u.created_at DESC`
   );
   return result.rows;
+};
+
+exports.getPendingUsers = async () => {
+  const result = await pool.query(
+    `SELECT u.user_id, u.fname, u.lname, u.email, u.role, u.created_at 
+     FROM users u
+     LEFT JOIN user_rejections ur ON u.user_id = ur.user_id
+     WHERE u.is_verified = false 
+     AND u.role != 'admin' 
+     AND ur.user_id IS NULL
+     ORDER BY u.created_at ASC`
+  );
+  return result.rows;
+};
+
+exports.verifyUser = async (userId) => {
+  // Clear any existing rejection first
+  await pool.query("DELETE FROM user_rejections WHERE user_id = $1", [userId]);
+  
+  const result = await pool.query(
+    "UPDATE users SET is_verified = true WHERE user_id = $1 RETURNING *",
+    [userId]
+  );
+  if (!result.rowCount) throw new Error("User not found");
+  return result.rows[0];
+};
+
+exports.rejectUser = async (userId, reason, description) => {
+  const result = await pool.query(
+    `INSERT INTO user_rejections (user_id, reason, description) 
+     VALUES ($1, $2, $3) 
+     ON CONFLICT (user_id) DO UPDATE 
+     SET reason = EXCLUDED.reason, description = EXCLUDED.description, rejected_at = NOW()
+     RETURNING *`,
+    [userId, reason, description]
+  );
+  return result.rows[0];
 };
 
 exports.getPendingStudents = async () => {
@@ -16,6 +56,53 @@ exports.getPendingStudents = async () => {
      JOIN students s ON u.user_id = s.user_id
      WHERE s.is_verified = false`
   );
+  return result.rows;
+};
+
+exports.getFilteredStudents = async (filters) => {
+  const { departments, min_cgpa, max_cgpa, placement_eligible } = filters;
+  let queryArgs = [];
+  let paramIndex = 1;
+
+  let query = `
+    SELECT u.fname, u.lname, u.email, s.department, s.cgpa, s.placement_eligible 
+    FROM students s 
+    JOIN users u ON s.user_id = u.user_id 
+    WHERE u.role = 'student'
+  `;
+
+  if (departments) {
+      const deptArray = departments.split(',').map(d => d.toLowerCase());
+      const placeholders = deptArray.map(() => `$${paramIndex++}`).join(',');
+      query += ` AND LOWER(s.department) IN (${placeholders})`;
+      queryArgs.push(...deptArray);
+}
+
+  if (min_cgpa) {
+    query += ` AND s.cgpa >= $${paramIndex++}`;
+    queryArgs.push(min_cgpa);
+  }
+
+  if (max_cgpa) {
+    query += ` AND s.cgpa <= $${paramIndex++}`;
+    queryArgs.push(max_cgpa);
+  }
+
+  if (placement_eligible && placement_eligible !== 'All') {
+    query += ` AND s.placement_eligible = $${paramIndex++}`;
+    queryArgs.push(placement_eligible === 'true');
+  }
+
+  const result = await pool.query(query, queryArgs);
+  return result.rows;
+};
+
+exports.getDepartments = async () => {
+  const result = await pool.query(`
+    SELECT DISTINCT department
+    FROM students
+    ORDER BY department
+  `);
   return result.rows;
 };
 

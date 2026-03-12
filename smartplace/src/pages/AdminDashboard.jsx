@@ -4,7 +4,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import '../styles/Dashboard.css';
 import DashboardLayout from '../components/layout/DashboardLayout';
-
+ 
 export default function AdminDashboard({ user, accessToken }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
@@ -12,18 +12,30 @@ export default function AdminDashboard({ user, accessToken }) {
   // Data State
   const [stats, setStats] = useState(null);
   const [pendingStudents, setPendingStudents] = useState([]);
+  const [pendingUsers, setPendingUsers] = useState([]);
   const [facultyList, setFacultyList] = useState([]);
   const [courses, setCourses] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
-  const [pendingDrives, setPendingDrives] = useState([]);
   const [allDrives, setAllDrives] = useState([]);
+  const [driveSubTab, setDriveSubTab] = useState('active');
   const [registrants, setRegistrants] = useState([]);
   const [selectedDrive, setSelectedDrive] = useState(null);
 
   // Modal/Form State
   const [showAdvisorModal, setShowAdvisorModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectingUserId, setRejectingUserId] = useState(null);
+  const [rejectionForm, setRejectionForm] = useState({ reason: '', description: '' });
   const [selectedStudentId, setSelectedStudentId] = useState(null);
   const [selectedAdvisorId, setSelectedAdvisorId] = useState('');
+
+  // Filter State
+  const [selectedDepartments, setSelectedDepartments] = useState([]);
+  const [minCgpa, setMinCgpa] = useState('');
+  const [maxCgpa, setMaxCgpa] = useState('');
+  const [placementEligible, setPlacementEligible] = useState('All');
+  const [filteredStudents, setFilteredStudents] = useState([]);
+  const [departments, setDepartments] = useState([]);
 
   const api = useMemo(() => {
     return axios.create({
@@ -41,6 +53,9 @@ export default function AdminDashboard({ user, accessToken }) {
       } else if (tab === 'students') {
         const res = await api.get('/admin/students/pending');
         setPendingStudents(res.data);
+      } else if (tab === 'pending-users') {
+        const res = await api.get('/admin/users/pending');
+        setPendingUsers(res.data);
       } else if (tab === 'faculty') {
         const res = await api.get('/admin/faculty');
         setFacultyList(res.data);
@@ -50,9 +65,6 @@ export default function AdminDashboard({ user, accessToken }) {
       } else if (tab === 'users') {
         const res = await api.get('/admin/users');
         setAllUsers(res.data);
-      } else if (tab === 'drives') {
-        const res = await api.get('/admin/drives/pending');
-        setPendingDrives(res.data);
       } else if (tab === 'all-drives') {
         const res = await api.get('/admin/drives');
         console.log('All Drives API Response:', res.data);
@@ -65,8 +77,28 @@ export default function AdminDashboard({ user, accessToken }) {
     }
   };
 
+  const fetchDepartments = async () => {
+    try {
+      const res = await api.get("/admin/departments");
+      setDepartments(res.data);
+    } catch (err) {
+      console.error("Failed to fetch departments");
+    }
+  };
+
   useEffect(() => {
+    if (activeTab === 'drives') {
+      setActiveTab('all-drives');
+      setDriveSubTab('pending');
+      return;
+    }
+
     fetchData(activeTab);
+
+    if (activeTab === "filter-students") {
+      fetchDepartments();
+    }
+
     setSelectedDrive(null);
   }, [activeTab]);
 
@@ -79,6 +111,29 @@ export default function AdminDashboard({ user, accessToken }) {
       alert('Student verified successfully');
     } catch (err) {
       alert('Verification failed');
+    }
+  };
+
+  const handleVerifyUser = async (id) => {
+    try {
+      await api.patch(`/admin/users/${id}/verify`);
+      setPendingUsers(prev => prev.filter(u => u.user_id !== id));
+      alert('User approved successfully');
+    } catch (err) {
+      alert('Approval failed');
+    }
+  };
+
+  const handleRejectUser = async () => {
+    if (!rejectionForm.reason) return alert('Please provide a reason');
+    try {
+      await api.post(`/admin/users/${rejectingUserId}/reject`, rejectionForm);
+      setPendingUsers(prev => prev.filter(u => u.user_id !== rejectingUserId));
+      setShowRejectModal(false);
+      setRejectionForm({ reason: '', description: '' });
+      alert('User rejected successfully');
+    } catch (err) {
+      alert('Rejection failed');
     }
   };
 
@@ -99,7 +154,6 @@ export default function AdminDashboard({ user, accessToken }) {
   const handleDriveStatus = async (driveId, status) => {
     try {
       await api.patch(`/admin/drives/${driveId}/status`, { status });
-      setPendingDrives(prev => prev.filter(d => d.drive_id !== driveId));
       if (activeTab === 'all-drives') fetchData('all-drives');
       alert(`Drive ${status.toLowerCase()}ed successfully`);
     } catch (err) {
@@ -118,6 +172,47 @@ export default function AdminDashboard({ user, accessToken }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchFilteredStudents = async () => {
+    try {
+      setLoading(true);
+      let eligibleParam = undefined;
+      if (placementEligible === 'Eligible') eligibleParam = 'true';
+      if (placementEligible === 'Not Eligible') eligibleParam = 'false';
+
+      const res = await api.get("/admin/students", {
+        params: {
+          departments: selectedDepartments.length > 0 ? selectedDepartments.join(",") : undefined,
+          min_cgpa: minCgpa || undefined,
+          max_cgpa: maxCgpa || undefined,
+          placement_eligible: eligibleParam
+        }
+      });
+      setFilteredStudents(res.data.students);
+    } catch (error) {
+      alert("Error fetching filtered students");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadFilteredPDF = () => {
+    if (filteredStudents.length === 0) return;
+    const doc = new jsPDF();
+    doc.text("Filtered Student List", 14, 15);
+    autoTable(doc, {
+      startY: 20,
+      head: [["Name", "Email", "Department", "CGPA", "Placement"]],
+      body: filteredStudents.map(s => [
+        `${s.fname} ${s.lname || ''}`.trim(),
+        s.email,
+        s.department,
+        s.cgpa,
+        s.placement_eligible ? "Yes" : "No"
+      ])
+    });
+    doc.save("filtered_students.pdf");
   };
 
   const handleDownloadPDF = () => {
@@ -172,13 +267,33 @@ export default function AdminDashboard({ user, accessToken }) {
 
   const sidebarItems = [
     { id: 'overview', label: 'Overview' },
+    { id: 'pending-users', label: 'Approve Registrations' },
     { id: 'students', label: 'Pending Students' },
-    { id: 'drives', label: 'Drive Requests' },
+    { id: 'filter-students', label: 'Student Filter' },
     { id: 'all-drives', label: 'All Drives' },
     { id: 'faculty', label: 'Faculty List' },
     { id: 'courses', label: 'All Courses' },
     { id: 'users', label: 'User Directory' },
   ];
+
+  const filteredDrives = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return allDrives.filter(d => {
+      const driveDate = new Date(d.drive_date);
+      driveDate.setHours(0, 0, 0, 0);
+
+      if (driveSubTab === 'pending') {
+        return d.status === 'PENDING';
+      } else if (driveSubTab === 'active') {
+        return d.status === 'APPROVED' && driveDate >= today;
+      } else if (driveSubTab === 'past') {
+        return (d.status === 'APPROVED' && driveDate < today) || d.status === 'REJECTED';
+      }
+      return true;
+    });
+  }, [allDrives, driveSubTab]);
 
   return (
     <DashboardLayout
@@ -293,6 +408,43 @@ export default function AdminDashboard({ user, accessToken }) {
           font-weight: 600;
           letter-spacing: 0.025em;
         }
+
+        .user-identity-cell {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 0.5rem 0;
+        }
+
+        .user-avatar-circle {
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          background: var(--bg-tertiary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 700;
+          color: #3b82f6;
+          border: 1px solid var(--border-color);
+          text-transform: uppercase;
+        }
+
+        .user-info-stack {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .user-name-text {
+          font-weight: 600;
+          color: var(--text-primary);
+          font-size: 0.95rem;
+        }
+
+        .user-email-sub {
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+        }
       `}</style>
 
       <header className="page-header">
@@ -327,7 +479,8 @@ export default function AdminDashboard({ user, accessToken }) {
         <div className="table-header-area">
           <h2 style={{ margin: 0, fontSize: '1.25rem' }}>
             {activeTab === 'students' ? 'Verification Queue' : 
-             activeTab === 'drives' ? 'Placement Drive Requests' :
+             activeTab === 'pending-users' ? 'Pending Registrations' :
+             activeTab === 'filter-students' ? 'Student Filter' : 
              activeTab === 'all-drives' ? 'All Placement Drives' :
              activeTab === 'faculty' ? 'Faculty Directory' :
              activeTab === 'courses' ? 'Academic Courses' :
@@ -341,6 +494,45 @@ export default function AdminDashboard({ user, accessToken }) {
         </div>
 
         <div className="table-responsive">
+          {activeTab === 'pending-users' && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Identity</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingUsers.length === 0 ? <tr><td colSpan={4} style={{textAlign:'center', padding: '3rem'}}>No pending registrations</td></tr> : 
+                  pendingUsers.map(u => (
+                    <tr key={u.user_id}>
+                      <td>
+                        <div className="user-identity-cell">
+                          <div className="user-avatar-circle">{u.fname[0]}{u.lname[0]}</div>
+                          <div className="user-info-stack">
+                            <span className="user-name-text">{u.fname} {u.lname}</span>
+                            <span className="user-email-sub">{u.email}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td>
+                        <span className="badge-pill" style={{background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6'}}>
+                          {u.role.toUpperCase()}
+                        </span>
+                      </td>
+                      <td><span className="user-id-text">{new Date(u.created_at).toLocaleDateString()}</span></td>
+                      <td className="action-buttons">
+                        <button className="btn btn-primary btn-sm" onClick={() => handleVerifyUser(u.user_id)}>Approve</button>
+                        <button className="btn btn-danger btn-sm" onClick={() => { setRejectingUserId(u.user_id); setShowRejectModal(true); }}>Reject</button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+
           {activeTab === 'students' && (
             <table className="data-table">
               <thead>
@@ -356,9 +548,12 @@ export default function AdminDashboard({ user, accessToken }) {
                   pendingStudents.map(s => (
                     <tr key={s.user_id}>
                       <td>
-                        <div className="user-details">
-                          <span className="user-email-text">{s.fname} {s.lname}</span>
-                          <span className="user-id-text">{s.email}</span>
+                        <div className="user-identity-cell">
+                          <div className="user-avatar-circle">{s.fname[0]}{s.lname[0]}</div>
+                          <div className="user-info-stack">
+                            <span className="user-name-text">{s.fname} {s.lname}</span>
+                            <span className="user-email-sub">{s.email}</span>
+                          </div>
                         </div>
                       </td>
                       <td>
@@ -378,56 +573,45 @@ export default function AdminDashboard({ user, accessToken }) {
             </table>
           )}
 
-          {activeTab === 'drives' && (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Company</th>
-                  <th>Date</th>
-                  <th>Type / Mode</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingDrives.length === 0 ? <tr><td colSpan={4} style={{textAlign:'center', padding: '3rem'}}>No pending drive requests</td></tr> : 
-                  pendingDrives.map(d => (
-                    <tr key={d.drive_id}>
-                      <td>
-                        <strong>{d.company_name || 'Unknown Company'}</strong>
-                      </td>
-                      <td>{new Date(d.drive_date).toLocaleDateString()}</td>
-                      <td>
-                        <span className="badge-pill" style={{background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6'}}>
-                          {d.drive_type.toUpperCase()}
-                        </span>
-                        <div className="user-id-text" style={{marginTop: '4px'}}>{d.mode.toUpperCase()}</div>
-                      </td>
-                      <td className="action-buttons">
-                        <button className="btn btn-primary" onClick={() => handleDriveStatus(d.drive_id, 'APPROVED')}>Approve</button>
-                        <button className="btn btn-danger" onClick={() => handleDriveStatus(d.drive_id, 'REJECTED')}>Reject</button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          )}
-
           {activeTab === 'all-drives' && (
             <div style={{ padding: '1.5rem' }}>
               {!selectedDrive ? (
                 <>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                      <h3 style={{ margin: 0 }}>All Placement Drives</h3>
+                      <h3 style={{ margin: 0 }}>Placement Drives</h3>
                       <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                        Manage both upcoming and historical recruitment events.
+                        Manage recruitment events across their lifecycle.
                       </p>
                     </div>
-                    <div style={{ display: 'flex', gap: '0.75rem' }}>
-                       <span className="badge-pill" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>Approved: {allDrives.filter(d => d.status === 'APPROVED').length}</span>
-                       <span className="badge-pill" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b' }}>Pending: {allDrives.filter(d => d.status === 'PENDING').length}</span>
+                    <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: '0.3rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      {[
+                        { id: 'pending', label: 'Pending Requests' },
+                        { id: 'active', label: 'Active Drives' },
+                        { id: 'past', label: 'Past Drives' }
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setDriveSubTab(tab.id)}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            borderRadius: '10px',
+                            border: 'none',
+                            fontSize: '0.85rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            background: driveSubTab === tab.id ? 'var(--bg-primary)' : 'transparent',
+                            color: driveSubTab === tab.id ? '#3b82f6' : 'var(--text-secondary)',
+                            boxShadow: driveSubTab === tab.id ? '0 2px 4px rgba(0,0,0,0.1)' : 'none'
+                          }}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
+
                   <table className="data-table">
                     <thead>
                       <tr>
@@ -439,10 +623,10 @@ export default function AdminDashboard({ user, accessToken }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {allDrives.length === 0 ? (
-                        <tr><td colSpan={5} style={{textAlign:'center', padding: '3rem'}}>No placement drives found</td></tr>
+                      {filteredDrives.length === 0 ? (
+                        <tr><td colSpan={5} style={{textAlign:'center', padding: '3rem'}}>No {driveSubTab} drives found</td></tr>
                       ) : (
-                        allDrives.map(d => (
+                        filteredDrives.map(d => (
                           <tr key={d.drive_id}>
                             <td><strong>{d.company_name || 'Unknown Company'}</strong></td>
                             <td>{new Date(d.drive_date).toLocaleDateString()}</td>
@@ -462,10 +646,17 @@ export default function AdminDashboard({ user, accessToken }) {
                                 {d.status}
                               </span>
                             </td>
-                            <td>
-                              <button className="btn btn-secondary btn-sm" onClick={() => fetchRegistrants(d)}>
-                                Details & Registrants
-                              </button>
+                            <td className="action-buttons">
+                              {d.status === 'PENDING' ? (
+                                <>
+                                  <button className="btn btn-primary btn-sm" onClick={() => handleDriveStatus(d.drive_id, 'APPROVED')}>Approve</button>
+                                  <button className="btn btn-danger btn-sm" onClick={() => handleDriveStatus(d.drive_id, 'REJECTED')}>Reject</button>
+                                </>
+                              ) : (
+                                <button className="btn btn-secondary btn-sm" onClick={() => fetchRegistrants(d)}>
+                                  Details & Registrants
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))
@@ -635,15 +826,19 @@ export default function AdminDashboard({ user, accessToken }) {
                   <th>Identity</th>
                   <th>Role</th>
                   <th>Registration Date</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {allUsers.map(u => (
                   <tr key={u.user_id}>
                     <td>
-                      <div className="user-details">
-                        <span className="user-email-text">{u.fname} {u.lname}</span>
-                        <span className="user-id-text">{u.email}</span>
+                      <div className="user-identity-cell">
+                        <div className="user-avatar-circle">{u.fname[0]}{u.lname[0]}</div>
+                        <div className="user-info-stack">
+                          <span className="user-name-text">{u.fname} {u.lname}</span>
+                          <span className="user-email-sub">{u.email}</span>
+                        </div>
                       </div>
                     </td>
                     <td>
@@ -652,12 +847,144 @@ export default function AdminDashboard({ user, accessToken }) {
                       </span>
                     </td>
                     <td><span className="user-id-text">{new Date(u.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</span></td>
+                    <td>
+                      {u.is_verified ? (
+                         <span className="badge-pill" style={{background: 'rgba(16, 185, 129, 0.1)', color: '#10b981'}}>VERIFIED</span>
+                      ) : (
+                         <span className="badge-pill" style={{background: u.rejection_reason ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: u.rejection_reason ? '#ef4444' : '#f59e0b'}}>
+                           {u.rejection_reason ? 'REJECTED' : 'PENDING'}
+                         </span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
           
+          {activeTab === 'filter-students' && (
+            <div style={{ padding: '1.5rem' }}>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Department</h4>
+               {departments.map(dep => (
+                <label 
+                  key={dep.department}
+                  style={{
+                    marginRight: '1.25rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
+                  }}
+                >
+                  <input 
+                    type="checkbox"
+                    value={dep.department}
+                    checked={selectedDepartments.includes(dep.department)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedDepartments([...selectedDepartments, dep.department]);
+                      } else {
+                        setSelectedDepartments(
+                          selectedDepartments.filter(d => d !== dep.department)
+                        );
+                      }
+                    }}
+                  />
+                  {dep.department}
+                </label>
+              ))}
+              </div>
+
+              <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Min CGPA</h4>
+                  <input 
+                    type="number" 
+                    className="form-input"
+                    placeholder="e.g. 7.0" 
+                    value={minCgpa} 
+                    onChange={(e) => setMinCgpa(e.target.value)} 
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '150px' }}
+                  />
+                </div>
+                <div>
+                  <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Max CGPA</h4>
+                  <input 
+                    type="number" 
+                    className="form-input"
+                    placeholder="e.g. 10.0" 
+                    value={maxCgpa} 
+                    onChange={(e) => setMaxCgpa(e.target.value)} 
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '150px' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '2rem' }}>
+                <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Placement Eligibility</h4>
+                <select 
+                  className="form-input"
+                  value={placementEligible} 
+                  onChange={(e) => setPlacementEligible(e.target.value)}
+                  style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', minWidth: '200px' }}
+                >
+                  <option value="All">All</option>
+                  <option value="Eligible">Eligible</option>
+                  <option value="Not Eligible">Not Eligible</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+                <button className="btn btn-primary" onClick={fetchFilteredStudents}>
+                  Apply Filter
+                </button>
+                <button className="btn btn-secondary" onClick={handleDownloadFilteredPDF} disabled={filteredStudents.length === 0}>
+                  Download PDF
+                </button>
+              </div>
+
+              {filteredStudents.length > 0 && (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Department</th>
+                      <th>CGPA</th>
+                      <th>Placement Eligible</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredStudents.map((s, index) => (
+                      <tr key={index}>
+                        <td>
+                          <strong>{`${s.fname} ${s.lname || ''}`.trim()}</strong>
+                        </td>
+                        <td><span className="user-id-text">{s.email}</span></td>
+                        <td>
+                          <span className="badge-pill" style={{background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6'}}>
+                            {s.department}
+                          </span>
+                        </td>
+                        <td><span style={{fontWeight: 600}}>GPA: {s.cgpa}</span></td>
+                        <td>
+                          <span className={`badge-pill`} style={{
+                            background: s.placement_eligible ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: s.placement_eligible ? '#10b981' : '#ef4444'
+                          }}>
+                            {s.placement_eligible ? "YES" : "NO"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
           {activeTab === 'overview' && (
              <div style={{padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)'}}>
                Select a category from the sidebar to manage specific system entities.
@@ -691,6 +1018,52 @@ export default function AdminDashboard({ user, accessToken }) {
             <div className="action-buttons" style={{ justifyContent: 'flex-end' }}>
               <button className="btn btn-secondary" onClick={() => setShowAdvisorModal(false)}>Cancel</button>
               <button className="btn btn-primary" style={{ padding: '0.5rem 1.5rem' }} onClick={handleAssignAdvisor}>Assign Advisor</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REJECTION MODAL */}
+      {showRejectModal && (
+        <div className="modern-modal-overlay">
+          <div className="modern-modal">
+            <h3 style={{ marginTop: 0, marginBottom: '0.5rem' }}>Reject Registration</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+              Provide a reason for rejecting this registration request.
+            </p>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Reason Flag</label>
+              <select 
+                className="form-input" 
+                style={{ width: '100%', borderRadius: '10px', padding: '0.75rem' }}
+                value={rejectionForm.reason}
+                onChange={(e) => setRejectionForm({ ...rejectionForm, reason: e.target.value })}
+              >
+                <option value="">-- Select Reason --</option>
+                <option value="Invalid Documents">Invalid Documents</option>
+                <option value="Incomplete Profile">Incomplete Profile</option>
+                <option value="Ineligible Candidate">Ineligible Candidate</option>
+                <option value="Security Concerns">Security Concerns</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem' }}>Description</label>
+              <textarea 
+                className="form-input" 
+                rows="4"
+                placeholder="Explain the reason for rejection..."
+                style={{ width: '100%', borderRadius: '10px', padding: '0.75rem', resize: 'none' }}
+                value={rejectionForm.description}
+                onChange={(e) => setRejectionForm({ ...rejectionForm, description: e.target.value })}
+              />
+            </div>
+
+            <div className="action-buttons" style={{ justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowRejectModal(false)}>Cancel</button>
+              <button className="btn btn-danger" style={{ padding: '0.5rem 1.5rem' }} onClick={handleRejectUser}>Reject User</button>
             </div>
           </div>
         </div>

@@ -40,5 +40,6 @@ router.get("/courses/:id/assessments", facultyController.getAssessments);
 router.get("/assessments/:id/submissions", facultyController.getSubmissions);
 router.patch("/submissions/:id/evaluate", facultyController.evaluateSubmission);
 router.get("/assessments/:id/report", facultyController.generateReport);
+router.delete("/assessments/:id", facultyController.deleteAssessment);
 
 module.exports = router;

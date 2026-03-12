@@ -47,9 +47,15 @@ router.get(
 );
 
 router.post(
-  "/courses/enroll",
+  "/courses/enroll/:courseId",
   authMiddleware,
   studentController.enrollInCourse
+);
+
+router.get(
+  "/courses/:courseId/materials",
+  authMiddleware,
+  studentController.getCourseMaterials
 );
 
 router.get(
@@ -75,24 +81,6 @@ router.get(
 );
 
 router.get(
-  "/assessments/:assessmentId",
-  authMiddleware,
-  studentController.getAssessmentDetails
-);
-
-router.post(
-  "/assessments/:assessmentId/start",
-  authMiddleware,
-  studentController.startAssessment
-);
-
-router.post(
-  "/assessments/submit",
-  authMiddleware,
-  studentController.submitAssessment
-);
-
-router.get(
   "/assessments/results",
   authMiddleware,
   studentController.getAssessmentResults
@@ -102,6 +90,24 @@ router.get(
   "/assessments/history",
   authMiddleware,
   studentController.getAssessmentHistory
+);
+
+router.get(
+  "/assessments/:assessmentId",
+  authMiddleware,
+  studentController.getAssessmentDetails
+);
+
+router.get(
+  "/assessments/:assessmentId/start",
+  authMiddleware,
+  studentController.startAssessment
+);
+
+router.post(
+  "/assessments/submit",
+  authMiddleware,
+  studentController.submitAssessment
 );
 
 /* =========================

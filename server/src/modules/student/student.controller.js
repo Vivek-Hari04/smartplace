@@ -58,7 +58,7 @@ async function getAvailableCourses(req, res) {
 
 async function enrollInCourse(req, res) {
   try {
-    const { courseId } = req.body;
+    const { courseId } = req.params;
     const data = await studentService.enrollInCourse(
       req.user.id,
       courseId
@@ -83,6 +83,16 @@ async function getFacultyContacts(req, res) {
   try {
     const { courseId } = req.params;
     const data = await studentService.getFacultyContacts(courseId);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function getCourseMaterials(req, res) {
+  try {
+    const { courseId } = req.params;
+    const data = await studentService.getCourseMaterials(courseId);
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -114,9 +124,10 @@ async function getAssessmentDetails(req, res) {
 
 async function startAssessment(req, res) {
   try {
+    const studentId = req.user.user_id || req.user.id;
     const { assessmentId } = req.params;
     const data = await studentService.startAssessment(
-      req.user.id,
+      studentId,
       assessmentId
     );
     res.status(200).json(data);
@@ -139,6 +150,27 @@ async function submitAssessment(req, res) {
   }
 }
 
+async function submitAssessment(req, res) {
+  try {
+    const studentId = req.user.user_id || req.user.id;
+    const { assessmentId } = req.params;
+    const { submission_url } = req.body;
+    
+    if (!submission_url) {
+      return res.status(400).json({ error: "submission_url is required" });
+    }
+
+    const data = await studentService.submitAssessment(
+      studentId,
+      assessmentId,
+      submission_url
+    );
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 async function getAssessmentResults(req, res) {
   try {
     const data = await studentService.getAssessmentResults(req.user.id);
@@ -150,7 +182,8 @@ async function getAssessmentResults(req, res) {
 
 async function getAssessmentHistory(req, res) {
   try {
-    const data = await studentService.getAssessmentHistory(req.user.id);
+    const studentId = req.user.user_id || req.user.id;
+    const data = await studentService.getAssessmentHistory(studentId);
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -284,6 +317,7 @@ module.exports = {
   enrollInCourse,
   getCourseDetails,
   getFacultyContacts,
+  getCourseMaterials,
   getUpcomingAssessments,
   getAssessmentDetails,
   startAssessment,

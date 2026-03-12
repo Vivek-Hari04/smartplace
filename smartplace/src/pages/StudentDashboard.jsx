@@ -21,6 +21,7 @@ export default function StudentDashboard({
   const [eligibleDrives, setEligibleDrives] = useState([]);
   const [driveEligibilityList, setDriveEligibilityList] = useState([]);
   const [driveStatus, setDriveStatus] = useState([]);
+  const [myOffers, setMyOffers] = useState([]);
 
   const [courseTab, setCourseTab] = useState("enrolled");
   const [isMaterialsModalOpen, setIsMaterialsModalOpen] = useState(false);
@@ -88,8 +89,14 @@ export default function StudentDashboard({
         const res = await api.get("/drives/status");
         setDriveStatus(res.data);
       } else if (tab === "offers") {
+        if (profile?.placement_eligible === false && profile?.placement_status === 'PLACED') {
+          return;
+        }
         const res = await api.get("/offers/eligible");
         setOffers(res.data);
+      } else if (tab === "my-offers") {
+        const res = await api.get("/offers/applications");
+        setMyOffers(res.data);
       }
     } catch (err) {
       setError(handleError(err));
@@ -108,6 +115,7 @@ export default function StudentDashboard({
     { id: "drive-eligibility", label: "Drive Eligibility" },
     { id: "drive-results", label: "Drive Results" },
     { id: "offers", label: "Job Offers" },
+    { id: "my-offers", label: "My Offers" },
     { id: "documents", label: "Documents" }
   ];
 
@@ -115,63 +123,63 @@ export default function StudentDashboard({
     const unappliedSelectedDrives = driveStatus.filter(d => d.status === 'selected').length > offers.filter(o => o.application_id).length;
 
     return (
-    <div className="home-dashboard">
-      <div className="welcome-banner">
-        <h1>Welcome back, {profile?.fname || "Student"}!</h1>
-        <p>Here's what's happening with your placements and courses today.</p>
-      </div>
-
-      {unappliedSelectedDrives && (
-        <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid #a7f3d0' }}>
-          <strong>🎉 Congratulations!</strong> You have been selected for a drive. <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab("offers"); }} style={{ color: '#047857', fontWeight: 'bold', textDecoration: 'underline' }}>View your job offer.</a>
+      <div className="home-dashboard">
+        <div className="welcome-banner">
+          <h1>Welcome back, {profile?.fname || "Student"}!</h1>
+          <p>Here's what's happening with your placements and courses today.</p>
         </div>
-      )}
-      <div className="dashboard-grid">
-        <div className="stats-container">
-          {stats.map((stat, index) => (
-            <div key={index} className="stat-card">
-              <div className="stat-info">
-                <span className="stat-label">{stat.label}</span>
-                <span className="stat-value">{stat.value}</span>
+
+        {unappliedSelectedDrives && (
+          <div style={{ backgroundColor: '#ecfdf5', color: '#065f46', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', border: '1px solid #a7f3d0' }}>
+            <strong>🎉 Congratulations!</strong> You have been selected for a drive. <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab("offers"); }} style={{ color: '#047857', fontWeight: 'bold', textDecoration: 'underline' }}>View your job offer.</a>
+          </div>
+        )}
+        <div className="dashboard-grid">
+          <div className="stats-container">
+            {stats.map((stat, index) => (
+              <div key={index} className="stat-card">
+                <div className="stat-info">
+                  <span className="stat-label">{stat.label}</span>
+                  <span className="stat-value">{stat.value}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="content-row">
+            <div className="content-card flex-2">
+              <h3>Upcoming Assessments</h3>
+              <div className="list-container">
+                {assessments.slice(0, 3).map((a, i) => (
+                  <div key={i} className="list-item">
+                    <div className="item-info">
+                      <span className="item-title">{a.title}</span>
+                      <span className="item-date">{new Date(a.deadline).toLocaleDateString()}</span>
+                    </div>
+                    <span className="status-badge pending">Upcoming</span>
+                  </div>
+                ))}
+                {assessments.length === 0 && <p>No upcoming assessments</p>}
               </div>
             </div>
-          ))}
-        </div>
 
-        <div className="content-row">
-          <div className="content-card flex-2">
-            <h3>Upcoming Assessments</h3>
-            <div className="list-container">
-              {assessments.slice(0, 3).map((a, i) => (
-                <div key={i} className="list-item">
-                  <div className="item-info">
-                    <span className="item-title">{a.title}</span>
-                    <span className="item-date">{new Date(a.deadline).toLocaleDateString()}</span>
+            <div className="content-card flex-1">
+              <h3>Recent Drive Registrations</h3>
+              <div className="list-container">
+                {slots.filter(s => s.registration_id).slice(0, 3).map((s, i) => (
+                  <div key={i} className="list-item">
+                    <div className="item-info">
+                      <span className="item-title">{s.company_name}</span>
+                    </div>
+                    <span className={`status-badge ${s.status}`}>{s.status}</span>
                   </div>
-                  <span className="status-badge pending">Upcoming</span>
-                </div>
-              ))}
-              {assessments.length === 0 && <p>No upcoming assessments</p>}
-            </div>
-          </div>
-
-          <div className="content-card flex-1">
-            <h3>Recent Drive Registrations</h3>
-            <div className="list-container">
-              {slots.filter(s => s.registration_id).slice(0, 3).map((s, i) => (
-                <div key={i} className="list-item">
-                  <div className="item-info">
-                    <span className="item-title">{s.company_name}</span>
-                  </div>
-                  <span className={`status-badge ${s.status}`}>{s.status}</span>
-                </div>
-              ))}
-              {slots.filter(s => s.registration_id).length === 0 && <p>No recent registrations</p>}
+                ))}
+                {slots.filter(s => s.registration_id).length === 0 && <p>No recent registrations</p>}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     );
   };
 
@@ -420,7 +428,7 @@ export default function StudentDashboard({
                     {a.score !== undefined && a.score !== null ? (
                       <span>Score: {a.score}</span>
                     ) : (
-                      <button 
+                      <button
                         className="btn btn-primary btn-sm"
                         onClick={async () => {
                           try {
@@ -520,7 +528,7 @@ export default function StudentDashboard({
         <button className="btn btn-primary" onClick={() => fetchData("eligible-drives")}>Refresh</button>
       </div>
       <p className="page-subtitle">Drives you are eligible for</p>
-      
+
       <div className="table-responsive">
         <table className="data-table">
           <thead>
@@ -579,27 +587,27 @@ export default function StudentDashboard({
 
       <div className="list-container" style={{ display: 'flex', gap: '1rem', flexDirection: 'column' }}>
         {driveEligibilityList.length === 0 ? (
-           <p style={{ padding: '2rem', textAlign: 'center' }}>No drives available</p>
+          <p style={{ padding: '2rem', textAlign: 'center' }}>No drives available</p>
         ) : (
           driveEligibilityList.map((drive) => (
             <div key={drive.drive_id} className="stat-card" style={{ flex: '1', border: '1px solid #eee', padding: '1rem', borderRadius: '8px', background: 'var(--bg-secondary)' }}>
-               <div style={{ marginBottom: '8px', fontSize: '1.1rem' }}>
-                 <strong>Drive: </strong> {drive.title}
-               </div>
-               <div style={{ marginBottom: '8px' }}>
-                 <strong>Eligibility: </strong> 
-                 {drive.eligible ? (
-                   <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Eligible</span>
-                 ) : (
-                   <span style={{ color: '#dc2626', fontWeight: 'bold' }}>Not Eligible</span>
-                 )}
-               </div>
-               {!drive.eligible && (
-                 <div>
-                   <strong>Reason: </strong> 
-                   <span style={{ color: '#dc2626' }}>✖ Not eligible — {drive.reason}</span>
-                 </div>
-               )}
+              <div style={{ marginBottom: '8px', fontSize: '1.1rem' }}>
+                <strong>Drive: </strong> {drive.title}
+              </div>
+              <div style={{ marginBottom: '8px' }}>
+                <strong>Eligibility: </strong>
+                {drive.eligible ? (
+                  <span style={{ color: '#16a34a', fontWeight: 'bold' }}>Eligible</span>
+                ) : (
+                  <span style={{ color: '#dc2626', fontWeight: 'bold' }}>Not Eligible</span>
+                )}
+              </div>
+              {!drive.eligible && (
+                <div>
+                  <strong>Reason: </strong>
+                  <span style={{ color: '#dc2626' }}>✖ Not eligible — {drive.reason}</span>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -631,20 +639,22 @@ export default function StudentDashboard({
               <th>Company</th>
               <th>Drive Date</th>
               <th>Type</th>
+              <th>Mode</th>
               <th>Status</th>
             </tr>
           </thead>
           <tbody>
             {driveStatus.length === 0 ? (
-              <tr><td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>No drive results found</td></tr>
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>No drive results found</td></tr>
             ) : (
               driveStatus.map((drive) => (
                 <tr key={drive.drive_id}>
                   <td><strong>{drive.company_name || 'TBA'}</strong></td>
                   <td>{new Date(drive.drive_date).toLocaleDateString()}</td>
                   <td>{drive.drive_type?.toUpperCase()}</td>
+                  <td>{drive.mode?.toUpperCase()}</td>
                   <td>
-                    <span 
+                    <span
                       style={{
                         padding: '4px 8px',
                         borderRadius: '4px',
@@ -666,11 +676,25 @@ export default function StudentDashboard({
     </section>
   );
 
-  const renderOffers = () => (
+  const renderOffers = () => {
+    if (profile?.placement_eligible === false && profile?.placement_status === 'PLACED') {
+      return (
+        <section className="content-card">
+          <div className="tab-header" style={{ justifyContent: 'center', display: 'flex', alignItems: 'center' }}>
+            <h3>Eligible Job Offers</h3>
+          </div>
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280', fontSize: '1.2rem', marginTop: '1rem', background: '#f9fafb', borderRadius: '8px' }}>
+            You are already placed and cannot participate in further job offers.
+          </div>
+        </section>
+      );
+    }
+
+    return (
     <section className="content-card">
-      <div className="tab-header">
-        <button className="btn btn-primary" onClick={() => fetchData("offers")}>View Eligible Offers</button>
-        <button className="btn btn-secondary" onClick={() => api.get("/offers/applications").then(res => setOffers(res.data))}>My Applications</button>
+      <div className="tab-header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+        <h3>Eligible Job Offers</h3>
+        <button className="btn btn-primary" onClick={() => fetchData("offers")}>Refresh</button>
       </div>
 
       <div className="table-responsive">
@@ -695,8 +719,13 @@ export default function StudentDashboard({
                   <td>{offer.package_lpa} LPA</td>
                   <td>{new Date(offer.acceptance_deadline || offer.applied_at).toLocaleDateString()}</td>
                   <td>
-                    {offer.application_id ? (
-                      <span className={`status-badge ${offer.status}`}>{offer.status.toUpperCase()}</span>
+                    {offer.application_status === 'accepted' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span className="status-badge" style={{ backgroundColor: '#16a34a', color: 'white', alignSelf: 'flex-start' }}>HIRED</span>
+                        <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 'bold' }}>You have been hired for this role.</span>
+                      </div>
+                    ) : offer.application_id ? (
+                      <span className="status-badge" style={{ backgroundColor: '#6b7280', color: 'white' }}>APPLIED</span>
                     ) : (
                       <button
                         className="btn btn-primary btn-sm"
@@ -712,6 +741,77 @@ export default function StudentDashboard({
                       >
                         Apply Now
                       </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    );
+  };
+
+  const renderMyOffers = () => (
+    <section className="content-card">
+      <div className="tab-header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
+        <h3>My Offers</h3>
+        <button className="btn btn-primary" onClick={() => fetchData("my-offers")}>Refresh</button>
+      </div>
+
+      <div className="table-responsive">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Package (CTC)</th>
+              <th>Deadline</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {myOffers.length === 0 ? (
+              <tr><td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>No application data found</td></tr>
+            ) : (
+              myOffers.map((offer) => (
+                <tr key={offer.application_id}>
+                  <td><strong>{offer.title}</strong></td>
+                  <td>{offer.package_lpa} LPA</td>
+                  <td>{new Date(offer.acceptance_deadline || offer.applied_at).toLocaleDateString()}</td>
+                  <td>
+                    <span className={`status-badge ${offer.status}`}>{offer.status.toUpperCase()}</span>
+                  </td>
+                  <td>
+                    {offer.status === 'accepted' ? (
+                      <span className="status-badge placed" style={{ backgroundColor: '#16a34a', color: 'white' }}>PLACED</span>
+                    ) : offer.status === 'offered' ? (
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button className="btn btn-primary btn-sm" onClick={async () => {
+                          try {
+                            await api.post("/offers/respond", { applicationId: offer.application_id, decision: 'accepted' });
+                            setMyOffers(prev => prev.map(o => o.application_id === offer.application_id ? { ...o, status: 'accepted' } : o));
+                            alert("Offer accepted successfully! Your placement eligibility is now resolved.");
+                            fetchData("profile");
+                          } catch (err) {
+                            alert(err.response?.data?.error || "Failed to accept offer");
+                          }
+                        }}>ACCEPT</button>
+                        <button className="btn btn-danger btn-sm" onClick={async () => {
+                          try {
+                            await api.post("/offers/respond", { applicationId: offer.application_id, decision: 'rejected' });
+                            setMyOffers(prev => prev.map(o => o.application_id === offer.application_id ? { ...o, status: 'rejected' } : o));
+                            alert("Offer rejected.");
+                          } catch (err) {
+                            alert(err.response?.data?.error || "Failed to reject offer");
+                          }
+                        }}>REJECT</button>
+                      </div>
+                    ) : offer.status === 'rejected' ? (
+                      <span style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '13px' }}>Rejected</span>
+                    ) : (
+                      <span style={{ color: '#6b7280', fontStyle: 'italic', fontSize: '13px' }}>Under Review</span>
                     )}
                   </td>
                 </tr>
@@ -805,21 +905,21 @@ export default function StudentDashboard({
         <div className="modal-overlay">
           <div className="modal-content">
             <h2>{currentAssessmentData.title}</h2>
-            <p style={{marginTop: "0.5rem", marginBottom: "1.5rem", color: "#6b7280"}}>
+            <p style={{ marginTop: "0.5rem", marginBottom: "1.5rem", color: "#6b7280" }}>
               {currentAssessmentData.description || "No description provided."}
             </p>
-            
+
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <input 
-                className="form-input" 
-                type="text" 
-                placeholder="Paste your submission link" 
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Paste your submission link"
                 value={submissionUrl}
                 onChange={(e) => setSubmissionUrl(e.target.value)}
               />
               <div style={{ display: "flex", gap: "1rem" }}>
-                <button 
-                  className="btn btn-primary" 
+                <button
+                  className="btn btn-primary"
                   onClick={async () => {
                     try {
                       await api.post(`/assessments/${currentAssessmentData.assessment_id}/submit`, { submission_url: submissionUrl });
@@ -870,58 +970,59 @@ export default function StudentDashboard({
         {activeTab === "drive-eligibility" && renderDriveEligibility()}
         {activeTab === "drive-results" && renderDriveStatus()}
         {activeTab === "offers" && renderOffers()}
+        {activeTab === "my-offers" && renderMyOffers()}
         {activeTab === "documents" && renderDocuments()}
       </div>
       {isMaterialsModalOpen && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.55)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 9999
-    }}
-  >
-    <div
-      style={{
-        background: "var(--bg-primary)",
-        padding: "24px",
-        borderRadius: "10px",
-        width: "480px",
-        maxHeight: "70vh",
-        overflowY: "auto",
-        boxShadow: "0 10px 40px rgba(0,0,0,0.25)"
-      }}
-    >
-      <h3>Course Materials</h3>
-
-      {currentMaterials.length === 0 ? (
-        <p>No materials available.</p>
-      ) : (
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {currentMaterials.map(mat => (
-            <li key={mat.material_id} style={{ padding: "8px 0" }}>
-              <a href={mat.file_url} target="_blank" rel="noreferrer">
-                📄 {mat.title}
-              </a>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div style={{ marginTop: "20px", textAlign: "right" }}>
-        <button
-          className="btn btn-secondary"
-          onClick={() => setIsMaterialsModalOpen(false)}
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999
+          }}
         >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div
+            style={{
+              background: "var(--bg-primary)",
+              padding: "24px",
+              borderRadius: "10px",
+              width: "480px",
+              maxHeight: "70vh",
+              overflowY: "auto",
+              boxShadow: "0 10px 40px rgba(0,0,0,0.25)"
+            }}
+          >
+            <h3>Course Materials</h3>
+
+            {currentMaterials.length === 0 ? (
+              <p>No materials available.</p>
+            ) : (
+              <ul style={{ listStyle: "none", padding: 0 }}>
+                {currentMaterials.map(mat => (
+                  <li key={mat.material_id} style={{ padding: "8px 0" }}>
+                    <a href={mat.file_url} target="_blank" rel="noreferrer">
+                      📄 {mat.title}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div style={{ marginTop: "20px", textAlign: "right" }}>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setIsMaterialsModalOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

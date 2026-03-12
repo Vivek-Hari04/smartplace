@@ -100,6 +100,26 @@ async function updateApplicantStatus(req, res) {
   }
 }
 
+async function getOfferApplicants(req, res) {
+  try {
+    const { offerId } = req.params;
+    const data = await companyService.getOfferApplicants(req.user.id, offerId);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function hireApplicant(req, res) {
+  try {
+    const { applicationId } = req.body;
+    const data = await companyService.hireApplicant(req.user.id, applicationId);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
@@ -109,5 +129,7 @@ module.exports = {
   createOffer,
   getMyOffers,
   getDriveApplicants,
-  updateApplicantStatus
+  updateApplicantStatus,
+  getOfferApplicants,
+  hireApplicant
 };

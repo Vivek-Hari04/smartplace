@@ -16,6 +16,8 @@ router.get("/drives/my", authMiddleware, roleMiddleware("company"), companyContr
 // Offers
 router.post("/offers", authMiddleware, roleMiddleware("company"), companyController.createOffer);
 router.get("/offers/my", authMiddleware, roleMiddleware("company"), companyController.getMyOffers);
+router.get("/offers/:offerId/applicants", authMiddleware, roleMiddleware("company"), companyController.getOfferApplicants);
+router.post("/offers/hire", authMiddleware, roleMiddleware("company"), companyController.hireApplicant);
 
 // Applicants
 router.get("/drives/:driveId/applicants", authMiddleware, roleMiddleware("company"), companyController.getDriveApplicants);

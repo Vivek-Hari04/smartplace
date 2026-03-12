@@ -29,7 +29,7 @@ async function getStaffAdvisors() {
 
 async function updateStudentProfile(userId, updateData) {
   const { department, graduation_year, cgpa, advisor_id } = updateData;
-  
+
   const result = await pool.query(
     `INSERT INTO students (user_id, department, graduation_year, cgpa, advisor_id)
      VALUES ($1, $2, $3, $4, $5)
@@ -306,7 +306,7 @@ async function getEligibleDrives(studentId) {
        AND pd.drive_date >= CURRENT_DATE
      ORDER BY pd.drive_date ASC`
   );
-  
+
   const eligibleDrives = [];
   for (const drive of result.rows) {
     const el = await checkStudentDriveEligibility(studentId, drive.drive_id);
@@ -331,7 +331,7 @@ async function getDriveEligibility(studentId) {
      WHERE pd.status = 'APPROVED'
      ORDER BY pd.drive_date DESC`
   );
-  
+
   const eligibilityList = [];
   for (const drive of result.rows) {
     const el = await checkStudentDriveEligibility(studentId, drive.drive_id);
@@ -401,12 +401,25 @@ async function getMyBookedSlots(studentId) {
 
 async function getEligibleOffers(studentId) {
   const result = await pool.query(
-    `SELECT po.*, u.fname, u.lname
+    `SELECT
+       po.offer_id,
+       po.title,
+       po.package_lpa,
+       po.acceptance_deadline,
+       u.fname,
+       u.lname,
+       c.company_name,
+       oa.application_id,
+       oa.status AS application_status
      FROM placement_offers po
-     JOIN users u ON po.company_id = u.user_id
-     JOIN drive_registrations dr ON po.drive_id = dr.drive_id
-     WHERE po.acceptance_deadline >= CURRENT_DATE
-       AND dr.student_id = $1
+     JOIN placement_drives d ON d.drive_id = po.drive_id
+     JOIN drive_registrations dr ON dr.drive_id = d.drive_id
+     JOIN users u ON u.user_id = po.company_id
+     LEFT JOIN companies c ON c.user_id = po.company_id
+     LEFT JOIN offer_applications oa
+       ON oa.offer_id = po.offer_id
+       AND oa.student_id = $1
+     WHERE dr.student_id = $1
        AND dr.status = 'selected'`,
     [studentId]
   );
@@ -434,6 +447,15 @@ async function applyForOffer(studentId, offerId) {
 
   if (regRes.rows.length === 0 || regRes.rows[0].status !== 'selected') {
     throw new Error("You are not selected for this drive");
+  }
+
+  // 3. New: check if already applied
+  const existingApp = await pool.query(
+    `SELECT application_id FROM offer_applications WHERE student_id = $1 AND offer_id = $2`,
+    [studentId, offerId]
+  );
+  if (existingApp.rows.length > 0) {
+    throw new Error("You have already applied for this offer");
   }
 
   const result = await pool.query(
@@ -481,6 +503,38 @@ async function withdrawApplication(studentId, applicationId) {
   return result.rows[0];
 }
 
+async function respondToOffer(studentId, applicationId, decision) {
+  if (!['accepted', 'rejected'].includes(decision)) {
+    throw new Error("Invalid decision");
+  }
+
+  const appRes = await pool.query(
+    `SELECT * FROM offer_applications WHERE application_id = $1 AND student_id = $2`,
+    [applicationId, studentId]
+  );
+
+  if (appRes.rows.length === 0) {
+    throw new Error("Application not found");
+  }
+
+  const updateRes = await pool.query(
+    `UPDATE offer_applications
+     SET status = $1, updated_at = NOW()
+     WHERE application_id = $2
+     RETURNING *`,
+    [decision, applicationId]
+  );
+
+  if (decision === 'accepted') {
+    await pool.query(
+      `UPDATE students SET placement_eligible = false, placement_status = 'PLACED' WHERE user_id = $1`,
+      [studentId]
+    );
+  }
+
+  return updateRes.rows[0];
+}
+
 async function getOfferHistory(studentId) {
   const result = await pool.query(
     `SELECT oa.*, po.title, po.package_lpa
@@ -499,6 +553,7 @@ async function getDriveStatus(studentId) {
        d.drive_id,
        d.drive_date,
        d.drive_type,
+       d.mode,
        c.company_name,
        r.status
      FROM drive_registrations r
@@ -540,5 +595,6 @@ module.exports = {
   getMyApplications,
   getOfferStatus,
   withdrawApplication,
+  respondToOffer,
   getOfferHistory
 };

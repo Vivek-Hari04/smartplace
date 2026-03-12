@@ -172,6 +172,12 @@ router.post(
   studentController.applyForOffer
 );
 
+router.post(
+  "/offers/respond",
+  authMiddleware,
+  studentController.respondToOffer
+);
+
 router.get(
   "/offers/applications",
   authMiddleware,

@@ -167,6 +167,62 @@ async function updateApplicantStatus(userId, registrationId, status) {
   return result.rows[0];
 }
 
+async function getOfferApplicants(companyId, offerId) {
+  const offerRes = await pool.query(
+    `SELECT * FROM placement_offers WHERE offer_id = $1 AND company_id = $2`,
+    [offerId, companyId]
+  );
+  if (offerRes.rows.length === 0) {
+    throw new Error("Offer not found or unauthorized");
+  }
+
+  const result = await pool.query(
+    `SELECT
+       oa.application_id,
+       s.user_id AS student_id,
+       u.fname,
+       u.lname,
+       s.department,
+       s.cgpa,
+       oa.status
+     FROM offer_applications oa
+     JOIN students s ON s.user_id = oa.student_id
+     JOIN users u ON u.user_id = s.user_id
+     WHERE oa.offer_id = $1`,
+    [offerId]
+  );
+  return result.rows;
+}
+
+async function hireApplicant(companyId, applicationId) {
+  const appRes = await pool.query(
+    `SELECT oa.* FROM offer_applications oa
+     JOIN placement_offers po ON oa.offer_id = po.offer_id
+     WHERE oa.application_id = $1 AND po.company_id = $2`,
+    [applicationId, companyId]
+  );
+  if (appRes.rows.length === 0) {
+    throw new Error("Application not found or unauthorized");
+  }
+  
+  const studentId = appRes.rows[0].student_id;
+
+  const result = await pool.query(
+    `UPDATE offer_applications
+     SET status = 'accepted', updated_at = NOW()
+     WHERE application_id = $1
+     RETURNING *`,
+    [applicationId]
+  );
+
+  await pool.query(
+    `UPDATE students SET placement_eligible = false WHERE user_id = $1`,
+    [studentId]
+  );
+
+  return result.rows[0];
+}
+
 module.exports = {
   getCompanyProfile,
   updateCompanyProfile,
@@ -176,5 +232,7 @@ module.exports = {
   createOffer,
   getMyOffers,
   getDriveApplicants,
-  updateApplicantStatus
+  updateApplicantStatus,
+  getOfferApplicants,
+  hireApplicant
 };

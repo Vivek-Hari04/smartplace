@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { useState, useEffect, useMemo } from "react";
+import axios from "axios";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
 import '../styles/Dashboard.css';
 import DashboardLayout from '../components/layout/DashboardLayout';
  

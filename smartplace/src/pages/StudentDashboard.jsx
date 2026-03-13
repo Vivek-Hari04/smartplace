@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import axios from "axios";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import Onboarding from "./Onboarding";
+import PlacementGuidance from "../components/PlacementGuidance";
 import "../styles/Dashboard.css";
 
 export default function StudentDashboard({
@@ -93,6 +94,7 @@ export default function StudentDashboard({
     { id: "assessments", label: "Assessments" },
     { id: "slots", label: "Placement Slots" },
     { id: "offers", label: "Job Offers" },
+    { id: "alumni", label: "Alumni Connect" },
     { id: "documents", label: "Documents" }
   ];
 
@@ -683,6 +685,7 @@ export default function StudentDashboard({
         {activeTab === "assessments" && renderAssessments()}
         {activeTab === "slots" && renderSlots()}
         {activeTab === "offers" && renderOffers()}
+        {activeTab === "alumni" && <PlacementGuidance accessToken={accessToken} userRole="student" />}
         {activeTab === "documents" && renderDocuments()}
       </div>
       {isMaterialsModalOpen && (

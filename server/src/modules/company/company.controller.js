@@ -35,6 +35,15 @@ async function requestDrive(req, res) {
   }
 }
 
+async function getFormOptions(req, res) {
+  try {
+    const data = await companyService.getFormOptions();
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 async function getMyDrives(req, res) {
   try {
     const data = await companyService.getMyDrives(req.user.id);
@@ -91,13 +100,36 @@ async function updateApplicantStatus(req, res) {
   }
 }
 
+async function getOfferApplicants(req, res) {
+  try {
+    const { offerId } = req.params;
+    const data = await companyService.getOfferApplicants(req.user.id, offerId);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function hireApplicant(req, res) {
+  try {
+    const { applicationId } = req.body;
+    const data = await companyService.hireApplicant(req.user.id, applicationId);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 module.exports = {
   getProfile,
   updateProfile,
   requestDrive,
+  getFormOptions,
   getMyDrives,
   createOffer,
   getMyOffers,
   getDriveApplicants,
-  updateApplicantStatus
+  updateApplicantStatus,
+  getOfferApplicants,
+  hireApplicant
 };

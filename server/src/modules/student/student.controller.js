@@ -206,11 +206,36 @@ async function getAvailableSlots(req, res) {
 async function bookSlot(req, res) {
   try {
     const { driveId } = req.body;
+    
+    // Check eligibility first
+    const eligibility = await studentService.checkStudentDriveEligibility(req.user.id, driveId);
+    if (!eligibility.eligible) {
+      return res.status(403).json({ error: eligibility.reason });
+    }
+
     const data = await studentService.bookSlot(
       req.user.id,
       driveId
     );
     res.status(201).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function getEligibleDrives(req, res) {
+  try {
+    const data = await studentService.getEligibleDrives(req.user.id);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function getDriveEligibility(req, res) {
+  try {
+    const data = await studentService.getDriveEligibility(req.user.id);
+    res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -238,6 +263,15 @@ async function getMyBookedSlots(req, res) {
   }
 }
 
+async function getDriveStatus(req, res) {
+  try {
+    const data = await studentService.getDriveStatus(req.user.id);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 /* =========================
    OFFERS
 ========================= */
@@ -259,6 +293,19 @@ async function applyForOffer(req, res) {
       offerId
     );
     res.status(201).json(data);
+  } catch (err) {
+    if (err.message === "You are not selected for this drive" || err.message === "You have already applied for this offer") {
+      return res.status(403).json({ error: err.message });
+    }
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function respondToOffer(req, res) {
+  try {
+    const { applicationId, decision } = req.body;
+    const data = await studentService.respondToOffer(req.user.id, applicationId, decision);
+    res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -324,12 +371,16 @@ module.exports = {
   submitAssessment,
   getAssessmentResults,
   getAssessmentHistory,
+  getEligibleDrives,
+  getDriveEligibility,
   getAvailableSlots,
   bookSlot,
   cancelSlot,
   getMyBookedSlots,
+  getDriveStatus,
   getEligibleOffers,
   applyForOffer,
+  respondToOffer,
   getMyApplications,
   getOfferStatus,
   withdrawApplication,

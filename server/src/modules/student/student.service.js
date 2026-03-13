@@ -29,7 +29,7 @@ async function getStaffAdvisors() {
 
 async function updateStudentProfile(userId, updateData) {
   const { department, graduation_year, cgpa, advisor_id } = updateData;
-  
+
   const result = await pool.query(
     `INSERT INTO students (user_id, department, graduation_year, cgpa, advisor_id)
      VALUES ($1, $2, $3, $4, $5)
@@ -242,6 +242,109 @@ async function getAssessmentHistory(studentId) {
    PLACEMENT SLOTS
 ========================= */
 
+async function checkStudentDriveEligibility(studentId, driveId) {
+  // 1. Fetch student
+  const studentRes = await pool.query(
+    `SELECT sm.* FROM students sm WHERE sm.user_id = $1`,
+    [studentId]
+  );
+  if (studentRes.rows.length === 0) {
+    return { eligible: false, reason: "Student profile not found" };
+  }
+  const student = studentRes.rows[0];
+
+  // 2. Fetch drive
+  const driveRes = await pool.query(
+    `SELECT * FROM placement_drives WHERE drive_id = $1`,
+    [driveId]
+  );
+  if (driveRes.rows.length === 0) {
+    return { eligible: false, reason: "Placement drive not found" };
+  }
+  const drive = driveRes.rows[0];
+
+  // 3. Check already registered
+  const regRes = await pool.query(
+    `SELECT 1 FROM drive_registrations WHERE student_id = $1 AND drive_id = $2`,
+    [studentId, driveId]
+  );
+  if (regRes.rows.length > 0) {
+    return { eligible: false, reason: "Student already registered for this drive" };
+  }
+
+  // 4. Check placement eligibility
+  if (!student.placement_eligible) {
+    return { eligible: false, reason: "Not eligible for placements" };
+  }
+
+  // 5. Check CGPA
+  if (drive.min_cgpa !== null && Number(student.cgpa) < Number(drive.min_cgpa)) {
+    return { eligible: false, reason: "Minimum CGPA requirement not met" };
+  }
+
+  // 6. Check Department
+  if (drive.eligible_departments && drive.eligible_departments.length > 0) {
+    if (!drive.eligible_departments.includes(student.department)) {
+      return { eligible: false, reason: "Department not eligible for this drive" };
+    }
+  }
+
+  // 7. Check Deadline
+  if (drive.registration_deadline && new Date(drive.registration_deadline) < new Date()) {
+    return { eligible: false, reason: "Registration deadline has passed" };
+  }
+
+  return { eligible: true };
+}
+
+async function getEligibleDrives(studentId) {
+  const result = await pool.query(
+    `SELECT pd.*, c.company_name
+     FROM placement_drives pd
+     LEFT JOIN companies c ON pd.company_id = c.user_id
+     WHERE pd.status = 'APPROVED'
+       AND pd.drive_date >= CURRENT_DATE
+     ORDER BY pd.drive_date ASC`
+  );
+
+  const eligibleDrives = [];
+  for (const drive of result.rows) {
+    const el = await checkStudentDriveEligibility(studentId, drive.drive_id);
+    if (el.eligible) {
+      eligibleDrives.push({
+        drive_id: drive.drive_id,
+        company_name: drive.company_name,
+        drive_date: drive.drive_date,
+        role: drive.drive_type,
+        package_lpa: "TBD" // Derived typically from offers, marking as TBD when unavailable
+      });
+    }
+  }
+  return eligibleDrives;
+}
+
+async function getDriveEligibility(studentId) {
+  const result = await pool.query(
+    `SELECT pd.*, c.company_name
+     FROM placement_drives pd
+     LEFT JOIN companies c ON pd.company_id = c.user_id
+     WHERE pd.status = 'APPROVED'
+     ORDER BY pd.drive_date DESC`
+  );
+
+  const eligibilityList = [];
+  for (const drive of result.rows) {
+    const el = await checkStudentDriveEligibility(studentId, drive.drive_id);
+    eligibilityList.push({
+      drive_id: drive.drive_id,
+      title: `${drive.company_name} ${drive.drive_type} Drive`,
+      eligible: el.eligible,
+      reason: el.reason || null
+    });
+  }
+  return eligibilityList;
+}
+
 async function getAvailableSlots(studentId) {
   const result = await pool.query(
     `SELECT pd.*, c.company_name
@@ -298,22 +401,63 @@ async function getMyBookedSlots(studentId) {
 
 async function getEligibleOffers(studentId) {
   const result = await pool.query(
-    `SELECT po.*, u.fname, u.lname
+    `SELECT
+       po.offer_id,
+       po.title,
+       po.package_lpa,
+       po.acceptance_deadline,
+       u.fname,
+       u.lname,
+       c.company_name,
+       oa.application_id,
+       oa.status AS application_status
      FROM placement_offers po
-     JOIN users u ON po.company_id = u.user_id
-     WHERE po.acceptance_deadline >= CURRENT_DATE
-       AND po.drive_id IN (
-         SELECT drive_id
-         FROM drive_registrations
-         WHERE student_id = $1
-           AND status = 'selected'
-       )`,
+     JOIN placement_drives d ON d.drive_id = po.drive_id
+     JOIN drive_registrations dr ON dr.drive_id = d.drive_id
+     JOIN users u ON u.user_id = po.company_id
+     LEFT JOIN companies c ON c.user_id = po.company_id
+     LEFT JOIN offer_applications oa
+       ON oa.offer_id = po.offer_id
+       AND oa.student_id = $1
+     WHERE dr.student_id = $1
+       AND dr.status = 'selected'`,
     [studentId]
   );
   return result.rows;
 }
 
 async function applyForOffer(studentId, offerId) {
+  // 1. Fetch the offer to get its drive_id
+  const offerRes = await pool.query(
+    `SELECT drive_id FROM placement_offers WHERE offer_id = $1`,
+    [offerId]
+  );
+
+  if (offerRes.rows.length === 0) {
+    throw new Error("Offer not found");
+  }
+
+  const driveId = offerRes.rows[0].drive_id;
+
+  // 2. Check student's registry status
+  const regRes = await pool.query(
+    `SELECT status FROM drive_registrations WHERE student_id = $1 AND drive_id = $2`,
+    [studentId, driveId]
+  );
+
+  if (regRes.rows.length === 0 || regRes.rows[0].status !== 'selected') {
+    throw new Error("You are not selected for this drive");
+  }
+
+  // 3. New: check if already applied
+  const existingApp = await pool.query(
+    `SELECT application_id FROM offer_applications WHERE student_id = $1 AND offer_id = $2`,
+    [studentId, offerId]
+  );
+  if (existingApp.rows.length > 0) {
+    throw new Error("You have already applied for this offer");
+  }
+
   const result = await pool.query(
     `INSERT INTO offer_applications (offer_id, student_id)
      VALUES ($1, $2)
@@ -359,6 +503,38 @@ async function withdrawApplication(studentId, applicationId) {
   return result.rows[0];
 }
 
+async function respondToOffer(studentId, applicationId, decision) {
+  if (!['accepted', 'rejected'].includes(decision)) {
+    throw new Error("Invalid decision");
+  }
+
+  const appRes = await pool.query(
+    `SELECT * FROM offer_applications WHERE application_id = $1 AND student_id = $2`,
+    [applicationId, studentId]
+  );
+
+  if (appRes.rows.length === 0) {
+    throw new Error("Application not found");
+  }
+
+  const updateRes = await pool.query(
+    `UPDATE offer_applications
+     SET status = $1, updated_at = NOW()
+     WHERE application_id = $2
+     RETURNING *`,
+    [decision, applicationId]
+  );
+
+  if (decision === 'accepted') {
+    await pool.query(
+      `UPDATE students SET placement_eligible = false, placement_status = 'PLACED' WHERE user_id = $1`,
+      [studentId]
+    );
+  }
+
+  return updateRes.rows[0];
+}
+
 async function getOfferHistory(studentId) {
   const result = await pool.query(
     `SELECT oa.*, po.title, po.package_lpa
@@ -366,6 +542,25 @@ async function getOfferHistory(studentId) {
      JOIN placement_offers po ON oa.offer_id = po.offer_id
      WHERE oa.student_id = $1
      ORDER BY oa.applied_at DESC`,
+    [studentId]
+  );
+  return result.rows;
+}
+
+async function getDriveStatus(studentId) {
+  const result = await pool.query(
+    `SELECT
+       d.drive_id,
+       d.drive_date,
+       d.drive_type,
+       d.mode,
+       c.company_name,
+       r.status
+     FROM drive_registrations r
+     JOIN placement_drives d ON d.drive_id = r.drive_id
+     JOIN companies c ON c.user_id = d.company_id
+     WHERE r.student_id = $1
+     ORDER BY d.drive_date DESC`,
     [studentId]
   );
   return result.rows;
@@ -387,14 +582,19 @@ module.exports = {
   submitAssessment,
   getAssessmentResults,
   getAssessmentHistory,
+  checkStudentDriveEligibility,
+  getEligibleDrives,
+  getDriveEligibility,
   getAvailableSlots,
   bookSlot,
   cancelSlot,
   getMyBookedSlots,
+  getDriveStatus,
   getEligibleOffers,
   applyForOffer,
   getMyApplications,
   getOfferStatus,
   withdrawApplication,
+  respondToOffer,
   getOfferHistory
 };

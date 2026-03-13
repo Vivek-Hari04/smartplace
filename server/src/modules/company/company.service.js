@@ -38,16 +38,51 @@ async function updateCompanyProfile(userId, updateData) {
 ========================= */
 
 async function requestPlacementDrive(userId, driveData) {
-  const { drive_date, start_time, end_time, mode, drive_type, location, meeting_link } = driveData;
+  const { drive_date, start_time, end_time, mode, drive_type, location, meeting_link, min_cgpa, eligible_departments, registration_deadline, graduation_year } = driveData;
   
+  if (min_cgpa !== undefined && (min_cgpa < 0 || min_cgpa > 10)) {
+    throw new Error("Invalid CGPA requirement");
+  }
+
+  if (registration_deadline && new Date(registration_deadline) >= new Date(drive_date)) {
+    throw new Error("Registration deadline must be before the drive date");
+  }
+
+  if (eligible_departments && eligible_departments.length > 0) {
+    const validDeptRes = await pool.query(`SELECT DISTINCT department FROM students WHERE department IS NOT NULL`);
+    const validDepts = validDeptRes.rows.map(r => r.department);
+    for (const dept of eligible_departments) {
+      if (!validDepts.includes(dept)) {
+        throw new Error(`Invalid department: ${dept}`);
+      }
+    }
+  }
+
+  if (graduation_year) {
+    const validYearRes = await pool.query(`SELECT DISTINCT graduation_year FROM students WHERE graduation_year IS NOT NULL`);
+    const validYears = validYearRes.rows.map(r => r.graduation_year.toString());
+    if (!validYears.includes(graduation_year.toString())) {
+      throw new Error(`Invalid graduation year: ${graduation_year}`);
+    }
+  }
+
   const result = await pool.query(
     `INSERT INTO placement_drives 
-     (company_id, drive_date, start_time, end_time, mode, drive_type, location, meeting_link, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING')
+     (company_id, drive_date, start_time, end_time, mode, drive_type, location, meeting_link, status, min_cgpa, eligible_departments, registration_deadline)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'PENDING', $9, $10, $11)
      RETURNING *`,
-    [userId, drive_date, start_time, end_time, mode, drive_type, location, meeting_link]
+    [userId, drive_date, start_time, end_time, mode, drive_type, location, meeting_link, min_cgpa !== undefined ? min_cgpa : null, eligible_departments || null, registration_deadline || null]
   );
   return result.rows[0];
+}
+
+async function getFormOptions() {
+  const deptsRes = await pool.query(`SELECT DISTINCT department FROM students WHERE department IS NOT NULL`);
+  const yearsRes = await pool.query(`SELECT DISTINCT graduation_year FROM students WHERE graduation_year IS NOT NULL ORDER BY graduation_year DESC`);
+  return {
+    departments: deptsRes.rows.map(r => r.department),
+    graduation_years: yearsRes.rows.map(r => r.graduation_year)
+  };
 }
 
 async function getMyDrives(userId) {
@@ -132,13 +167,72 @@ async function updateApplicantStatus(userId, registrationId, status) {
   return result.rows[0];
 }
 
+async function getOfferApplicants(companyId, offerId) {
+  const offerRes = await pool.query(
+    `SELECT * FROM placement_offers WHERE offer_id = $1 AND company_id = $2`,
+    [offerId, companyId]
+  );
+  if (offerRes.rows.length === 0) {
+    throw new Error("Offer not found or unauthorized");
+  }
+
+  const result = await pool.query(
+    `SELECT
+       oa.application_id,
+       s.user_id AS student_id,
+       u.fname,
+       u.lname,
+       s.department,
+       s.cgpa,
+       oa.status
+     FROM offer_applications oa
+     JOIN students s ON s.user_id = oa.student_id
+     JOIN users u ON u.user_id = s.user_id
+     WHERE oa.offer_id = $1`,
+    [offerId]
+  );
+  return result.rows;
+}
+
+async function hireApplicant(companyId, applicationId) {
+  const appRes = await pool.query(
+    `SELECT oa.* FROM offer_applications oa
+     JOIN placement_offers po ON oa.offer_id = po.offer_id
+     WHERE oa.application_id = $1 AND po.company_id = $2`,
+    [applicationId, companyId]
+  );
+  if (appRes.rows.length === 0) {
+    throw new Error("Application not found or unauthorized");
+  }
+  
+  const studentId = appRes.rows[0].student_id;
+
+  const result = await pool.query(
+    `UPDATE offer_applications
+     SET status = 'accepted', updated_at = NOW()
+     WHERE application_id = $1
+     RETURNING *`,
+    [applicationId]
+  );
+
+  await pool.query(
+    `UPDATE students SET placement_eligible = false WHERE user_id = $1`,
+    [studentId]
+  );
+
+  return result.rows[0];
+}
+
 module.exports = {
   getCompanyProfile,
   updateCompanyProfile,
   requestPlacementDrive,
+  getFormOptions,
   getMyDrives,
   createOffer,
   getMyOffers,
   getDriveApplicants,
-  updateApplicantStatus
+  updateApplicantStatus,
+  getOfferApplicants,
+  hireApplicant
 };

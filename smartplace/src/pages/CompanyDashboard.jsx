@@ -15,6 +15,9 @@ export default function CompanyDashboard({ user, accessToken }) {
   const [offers, setOffers] = useState([]);
   const [selectedDriveId, setSelectedDriveId] = useState(null);
   const [applicants, setApplicants] = useState([]);
+  const [offerApplicants, setOfferApplicants] = useState([]);
+  const [selectedOfferId, setSelectedOfferId] = useState(null);
+  const [formOptions, setFormOptions] = useState({ departments: [], graduation_years: [] });
 
   const needsOnboarding = useMemo(() => {
     return profile && profile.user_id === null;
@@ -37,6 +40,8 @@ export default function CompanyDashboard({ user, accessToken }) {
       } else if (tab === 'drives') {
         const res = await api.get('/company/drives/my');
         setDrives(res.data);
+        const optRes = await api.get('/company/drives/form-options');
+        setFormOptions(optRes.data);
       } else if (tab === 'offers') {
         const res = await api.get('/company/offers/my');
         setOffers(res.data);
@@ -98,7 +103,11 @@ export default function CompanyDashboard({ user, accessToken }) {
     mode: 'online',
     drive_type: 'technical',
     location: '',
-    meeting_link: ''
+    meeting_link: '',
+    min_cgpa: '',
+    registration_deadline: '',
+    eligible_departments: [],
+    graduation_year: ''
   });
 
   /* OFFER POSTING */
@@ -162,6 +171,29 @@ export default function CompanyDashboard({ user, accessToken }) {
       setApplicants(prev => prev.map(a => a.registration_id === regId ? { ...a, status: status } : a));
     } catch (err) {
       alert('Status update failed');
+    }
+  };
+
+  const fetchOfferApplicants = async (offerId) => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/company/offers/${offerId}/applicants`);
+      setOfferApplicants(res.data);
+      setSelectedOfferId(offerId);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to fetch applicants');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleHire = async (applicationId) => {
+    try {
+      await api.post('/company/offers/hire', { applicationId });
+      alert('Applicant hired! They will need to accept the offer.');
+      setOfferApplicants(prev => prev.map(a => a.application_id === applicationId ? { ...a, status: 'accepted' } : a));
+    } catch (err) {
+      alert(err.response?.data?.error || 'Hiring failed');
     }
   };
 
@@ -408,6 +440,39 @@ export default function CompanyDashboard({ user, accessToken }) {
                 <label>Location / Meeting Link</label>
                 <input type="text" className="form-input" placeholder="Room 302 or Zoom link" value={driveForm.location} onChange={e => setDriveForm({...driveForm, location: e.target.value})} />
               </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="form-group flex-1">
+                  <label>Min CGPA (0-10)</label>
+                  <input type="number" step="0.1" min="0" max="10" className="form-input" value={driveForm.min_cgpa} onChange={e => setDriveForm({...driveForm, min_cgpa: e.target.value})} />
+                </div>
+                <div className="form-group flex-1">
+                  <label>Registration Deadline</label>
+                  <input type="datetime-local" className="form-input" value={driveForm.registration_deadline} onChange={e => setDriveForm({...driveForm, registration_deadline: e.target.value})} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <div className="form-group flex-1">
+                  <label>Eligible Departments</label>
+                  <select multiple className="form-input" value={driveForm.eligible_departments} onChange={e => {
+                    const options = Array.from(e.target.selectedOptions);
+                    setDriveForm({...driveForm, eligible_departments: options.map(o => o.value)});
+                  }} style={{ height: '80px' }}>
+                    {formOptions.departments.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                  <small style={{color: '#666', fontSize: '0.8rem'}}>Hold Ctrl/Cmd to select multiple</small>
+                </div>
+                <div className="form-group flex-1">
+                  <label>Graduation Year</label>
+                  <select className="form-input" value={driveForm.graduation_year} onChange={e => setDriveForm({...driveForm, graduation_year: e.target.value})}>
+                    <option value="">Any</option>
+                    {formOptions.graduation_years.map(yr => (
+                      <option key={yr} value={yr}>{yr}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div className="action-row" style={{ marginTop: '1rem' }}>
                 <button type="submit" className="btn btn-primary">Submit Request</button>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowDriveModal(false)}>Cancel</button>
@@ -435,6 +500,7 @@ export default function CompanyDashboard({ user, accessToken }) {
               <th>Package (LPA)</th>
               <th>Deadline</th>
               <th>Location</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -446,12 +512,55 @@ export default function CompanyDashboard({ user, accessToken }) {
                   <td>{o.package_lpa}</td>
                   <td>{new Date(o.acceptance_deadline).toLocaleDateString()}</td>
                   <td>{o.location}</td>
+                  <td>
+                    <button className="btn btn-secondary btn-sm" onClick={() => fetchOfferApplicants(o.offer_id)}>VIEW APPLICANTS</button>
+                  </td>
                 </tr>
               ))
             }
           </tbody>
         </table>
       </div>
+
+      {selectedOfferId && (
+        <div className="applicants-section" style={{ marginTop: '2rem' }}>
+          <h4>Applicants for Offer #{selectedOfferId}</h4>
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Student Name</th>
+                  <th>Department</th>
+                  <th>CGPA</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {offerApplicants.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: '1rem' }}>No applicants found for this offer</td></tr>
+                ) : (
+                  offerApplicants.map(a => (
+                    <tr key={a.application_id}>
+                      <td>{a.fname} {a.lname}</td>
+                      <td>{a.department}</td>
+                      <td>{a.cgpa}</td>
+                      <td><span className={`status-badge ${a.status.toLowerCase()}`}>{a.status.toUpperCase()}</span></td>
+                      <td>
+                        {a.status === 'applied' ? (
+                          <button className="btn btn-primary btn-sm" onClick={() => handleHire(a.application_id)}>HIRE</button>
+                        ) : (
+                          <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>{a.status.toUpperCase()}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {showOfferModal && (
         <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>

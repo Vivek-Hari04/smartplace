@@ -9,12 +9,15 @@ router.get("/profile", authMiddleware, roleMiddleware("company"), companyControl
 router.put("/profile", authMiddleware, roleMiddleware("company"), companyController.updateProfile);
 
 // Drives
+router.get("/drives/form-options", authMiddleware, roleMiddleware("company"), companyController.getFormOptions);
 router.post("/drives/request", authMiddleware, roleMiddleware("company"), companyController.requestDrive);
 router.get("/drives/my", authMiddleware, roleMiddleware("company"), companyController.getMyDrives);
 
 // Offers
 router.post("/offers", authMiddleware, roleMiddleware("company"), companyController.createOffer);
 router.get("/offers/my", authMiddleware, roleMiddleware("company"), companyController.getMyOffers);
+router.get("/offers/:offerId/applicants", authMiddleware, roleMiddleware("company"), companyController.getOfferApplicants);
+router.post("/offers/hire", authMiddleware, roleMiddleware("company"), companyController.hireApplicant);
 
 // Applicants
 router.get("/drives/:driveId/applicants", authMiddleware, roleMiddleware("company"), companyController.getDriveApplicants);

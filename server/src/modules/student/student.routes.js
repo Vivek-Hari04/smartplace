@@ -115,6 +115,18 @@ router.post(
 ========================= */
 
 router.get(
+  "/eligible-drives",
+  authMiddleware,
+  studentController.getEligibleDrives
+);
+
+router.get(
+  "/drive-eligibility",
+  authMiddleware,
+  studentController.getDriveEligibility
+);
+
+router.get(
   "/slots/available",
   authMiddleware,
   studentController.getAvailableSlots
@@ -138,6 +150,12 @@ router.get(
   studentController.getMyBookedSlots
 );
 
+router.get(
+  "/drives/status",
+  authMiddleware,
+  studentController.getDriveStatus
+);
+
 /* =========================
    OFFERS
 ========================= */
@@ -152,6 +170,12 @@ router.post(
   "/offers/apply",
   authMiddleware,
   studentController.applyForOffer
+);
+
+router.post(
+  "/offers/respond",
+  authMiddleware,
+  studentController.respondToOffer
 );
 
 router.get(

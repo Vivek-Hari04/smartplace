@@ -539,6 +539,16 @@ async function respondToOffer(studentId, offerId, decision) {
     [offerId, studentId]
   );
 
+  // Check if student is already placed
+  const studentDetails = await pool.query(
+    `SELECT placement_status FROM students WHERE user_id = $1`,
+    [studentId]
+  );
+
+  if (decision === 'accepted' && studentDetails.rows[0]?.placement_status === 'PLACED') {
+    throw new Error("Student already placed. Cannot accept another offer.");
+  }
+
   let updateRes;
   let previousStatus = null;
   
@@ -571,12 +581,11 @@ async function respondToOffer(studentId, offerId, decision) {
     if (updateRes.rows.length === 0) throw new Error("Concurrent duplicate request detected.");
   }
 
-  // Prevents incrementing multiple times
+  // Set placement_status only
   if (decision === 'accepted' && previousStatus !== 'accepted') {
     await pool.query(
       `UPDATE students 
-       SET offers_received = offers_received + 1, 
-           placement_status = 'PLACED' 
+       SET placement_status = 'PLACED' 
        WHERE user_id = $1`,
       [studentId]
     );

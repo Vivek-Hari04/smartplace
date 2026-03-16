@@ -286,16 +286,31 @@ async function hireApplicant(companyId, applicationId) {
 
   const result = await pool.query(
     `UPDATE offer_applications
-     SET status = 'accepted', updated_at = NOW()
+     SET status = 'offered', updated_at = NOW()
      WHERE application_id = $1
      RETURNING *`,
     [applicationId]
   );
 
+  // Increment offers_received, but don't set placement_eligible to false unconditionally
   await pool.query(
-    `UPDATE students SET placement_eligible = false WHERE user_id = $1`,
+    `UPDATE students
+     SET offers_received = offers_received + 1
+     WHERE user_id = $1`,
     [studentId]
   );
+
+  // Check if offers bounds reached, then set eligibility
+  const studentRes = await pool.query(
+    `SELECT offers_received FROM students WHERE user_id = $1`,
+    [studentId]
+  );
+  if (studentRes.rows[0].offers_received >= 2) {
+    await pool.query(
+      `UPDATE students SET placement_eligible = false WHERE user_id = $1`,
+      [studentId]
+    );
+  }
 
   return result.rows[0];
 }

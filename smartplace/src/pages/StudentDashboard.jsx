@@ -811,6 +811,11 @@ export default function StudentDashboard({
 
   const renderMyOffers = () => (
     <section className="content-card">
+      {profile?.placement_status === 'PLACED' && (
+        <div style={{ backgroundColor: '#fef2f2', color: '#991b1b', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #fecaca', fontWeight: 'bold' }}>
+          You are already placed and cannot accept additional offers.
+        </div>
+      )}
       <div className="tab-header" style={{ justifyContent: 'space-between', display: 'flex', alignItems: 'center' }}>
         <h3>My Offers</h3>
         <button className="btn btn-primary" onClick={() => fetchData("my-offers")}>Refresh</button>
@@ -844,7 +849,7 @@ export default function StudentDashboard({
                       <span className="status-badge placed" style={{ backgroundColor: '#16a34a', color: 'white' }}>PLACED</span>
                     ) : offer.status === 'offered' ? (
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn btn-primary btn-sm" onClick={async () => {
+                        <button className="btn btn-primary btn-sm" disabled={profile?.placement_status === 'PLACED'} onClick={async () => {
                           try {
                             await api.post("/offers/respond", { offerId: offer.offer_id, decision: 'accepted' });
                             setMyOffers(prev => prev.map(o => o.offer_id === offer.offer_id ? { ...o, status: 'accepted' } : o));

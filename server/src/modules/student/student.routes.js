@@ -160,18 +160,6 @@ router.get(
    OFFERS
 ========================= */
 
-router.get(
-  "/offers/eligible",
-  authMiddleware,
-  studentController.getEligibleOffers
-);
-
-router.post(
-  "/offers/apply",
-  authMiddleware,
-  studentController.applyForOffer
-);
-
 router.post(
   "/offers/respond",
   authMiddleware,

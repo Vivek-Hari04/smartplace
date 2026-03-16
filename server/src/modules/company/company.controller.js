@@ -53,6 +53,16 @@ async function getMyDrives(req, res) {
   }
 }
 
+async function deleteDrive(req, res) {
+  try {
+    const { driveId } = req.params;
+    const data = await companyService.deleteDrive(req.user.id, driveId);
+    res.status(200).json({ message: "Drive deleted successfully", data });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
 /* =========================
    PLACEMENT OFFERS
 ========================= */
@@ -70,6 +80,16 @@ async function getMyOffers(req, res) {
   try {
     const data = await companyService.getMyOffers(req.user.id);
     res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function deleteOffer(req, res) {
+  try {
+    const { offerId } = req.params;
+    const data = await companyService.deleteOffer(req.user.id, offerId);
+    res.status(200).json({ message: "Offer deleted successfully", data });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
@@ -126,8 +146,10 @@ module.exports = {
   requestDrive,
   getFormOptions,
   getMyDrives,
+  deleteDrive,
   createOffer,
   getMyOffers,
+  deleteOffer,
   getDriveApplicants,
   updateApplicantStatus,
   getOfferApplicants,

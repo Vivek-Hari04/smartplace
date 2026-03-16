@@ -105,7 +105,10 @@ async function getCourseMaterials(req, res) {
 
 async function getUpcomingAssessments(req, res) {
   try {
-    const data = await studentService.getUpcomingAssessments();
+    const studentId = req.user.id;
+
+    const data = await studentService.getUpcomingAssessments(studentId);
+
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -114,8 +117,11 @@ async function getUpcomingAssessments(req, res) {
 
 async function getAssessmentDetails(req, res) {
   try {
+    const studentId = req.user.id;
     const { assessmentId } = req.params;
-    const data = await studentService.getAssessmentDetails(assessmentId);
+
+    const data = await studentService.getAssessmentDetails(studentId, assessmentId);
+
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -155,7 +161,7 @@ async function submitAssessment(req, res) {
     const studentId = req.user.user_id || req.user.id;
     const { assessmentId } = req.params;
     const { submission_url } = req.body;
-    
+
     if (!submission_url) {
       return res.status(400).json({ error: "submission_url is required" });
     }
@@ -206,7 +212,7 @@ async function getAvailableSlots(req, res) {
 async function bookSlot(req, res) {
   try {
     const { driveId } = req.body;
-    
+
     // Check eligibility first
     const eligibility = await studentService.checkStudentDriveEligibility(req.user.id, driveId);
     if (!eligibility.eligible) {
@@ -276,35 +282,10 @@ async function getDriveStatus(req, res) {
    OFFERS
 ========================= */
 
-async function getEligibleOffers(req, res) {
-  try {
-    const data = await studentService.getEligibleOffers(req.user.id);
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-async function applyForOffer(req, res) {
-  try {
-    const { offerId } = req.body;
-    const data = await studentService.applyForOffer(
-      req.user.id,
-      offerId
-    );
-    res.status(201).json(data);
-  } catch (err) {
-    if (err.message === "You are not selected for this drive" || err.message === "You have already applied for this offer") {
-      return res.status(403).json({ error: err.message });
-    }
-    res.status(400).json({ error: err.message });
-  }
-}
-
 async function respondToOffer(req, res) {
   try {
-    const { applicationId, decision } = req.body;
-    const data = await studentService.respondToOffer(req.user.id, applicationId, decision);
+    const { offerId, decision } = req.body;
+    const data = await studentService.respondToOffer(req.user.id, offerId, decision);
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -378,8 +359,6 @@ module.exports = {
   cancelSlot,
   getMyBookedSlots,
   getDriveStatus,
-  getEligibleOffers,
-  applyForOffer,
   respondToOffer,
   getMyApplications,
   getOfferStatus,

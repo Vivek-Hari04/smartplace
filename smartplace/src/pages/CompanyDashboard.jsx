@@ -197,6 +197,42 @@ export default function CompanyDashboard({ user, accessToken }) {
     }
   };
 
+  const handleDeleteDrive = async (driveId) => {
+    if (!window.confirm("Are you sure you want to delete this drive?")) return;
+    try {
+      setLoading(true);
+      await api.delete(`/company/drives/${driveId}`);
+      alert("Drive deleted successfully");
+      fetchData('drives');
+      if (selectedDriveId === driveId) {
+        setSelectedDriveId(null);
+        setApplicants([]);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to delete drive");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteOffer = async (offerId) => {
+    if (!window.confirm("Are you sure you want to delete this offer?")) return;
+    try {
+      setLoading(true);
+      await api.delete(`/company/offers/${offerId}`);
+      alert("Offer deleted successfully");
+      fetchData('offers');
+      if (selectedOfferId === offerId) {
+        setSelectedOfferId(null);
+        setOfferApplicants([]);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to delete offer");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const sidebarItems = [
     { id: 'home', label: 'Dashboard' },
     { id: 'profile', label: 'Company Profile' },
@@ -349,7 +385,10 @@ export default function CompanyDashboard({ user, accessToken }) {
                     </span>
                   </td>
                   <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => fetchApplicants(d.drive_id)}>View Applicants</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => fetchApplicants(d.drive_id)}>View Applicants</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteDrive(d.drive_id)}>Delete</button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -513,7 +552,10 @@ export default function CompanyDashboard({ user, accessToken }) {
                   <td>{new Date(o.acceptance_deadline).toLocaleDateString()}</td>
                   <td>{o.location}</td>
                   <td>
-                    <button className="btn btn-secondary btn-sm" onClick={() => fetchOfferApplicants(o.offer_id)}>VIEW APPLICANTS</button>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button className="btn btn-secondary btn-sm" onClick={() => fetchOfferApplicants(o.offer_id)}>VIEW APPLICANTS</button>
+                      <button className="btn btn-danger btn-sm" onClick={() => handleDeleteOffer(o.offer_id)}>DELETE</button>
+                    </div>
                   </td>
                 </tr>
               ))

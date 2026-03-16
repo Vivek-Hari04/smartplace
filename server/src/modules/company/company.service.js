@@ -93,6 +93,36 @@ async function getMyDrives(userId) {
   return result.rows;
 }
 
+async function deleteDrive(companyId, driveId) {
+  // Validate ownership
+  const driveCheck = await pool.query(
+    `SELECT 1 FROM placement_drives WHERE drive_id = $1 AND company_id = $2`,
+    [driveId, companyId]
+  );
+
+  if (driveCheck.rows.length === 0) {
+    throw new Error("Invalid drive ID or unauthorized");
+  }
+
+  // Check registrations
+  const regCheck = await pool.query(
+    `SELECT COUNT(*) FROM drive_registrations WHERE drive_id = $1`,
+    [driveId]
+  );
+
+  if (parseInt(regCheck.rows[0].count) > 0) {
+    throw new Error("Cannot delete drive. Students have already registered.");
+  }
+
+  // Delete
+  const result = await pool.query(
+    `DELETE FROM placement_drives WHERE drive_id = $1 AND company_id = $2 RETURNING *`,
+    [driveId, companyId]
+  );
+
+  return result.rows[0];
+}
+
 /* =========================
    PLACEMENT OFFERS
 ========================= */
@@ -129,6 +159,42 @@ async function getMyOffers(userId) {
     [userId]
   );
   return result.rows;
+}
+
+async function deleteOffer(companyId, offerId) {
+  // Validate ownership
+  const offerCheck = await pool.query(
+    `SELECT 1 FROM placement_offers WHERE offer_id = $1 AND company_id = $2`,
+    [offerId, companyId]
+  );
+
+  if (offerCheck.rows.length === 0) {
+    throw new Error("Invalid offer ID or unauthorized");
+  }
+
+  // Check if any student accepted the offer
+  const acceptCheck = await pool.query(
+    `SELECT COUNT(*) FROM offer_applications WHERE offer_id = $1 AND status = 'accepted'`,
+    [offerId]
+  );
+
+  if (parseInt(acceptCheck.rows[0].count) > 0) {
+    throw new Error("Cannot delete offer. A student has already accepted it.");
+  }
+
+  // Delete dependent applications first
+  await pool.query(
+    `DELETE FROM offer_applications WHERE offer_id = $1`,
+    [offerId]
+  );
+
+  // Then delete offer
+  const result = await pool.query(
+    `DELETE FROM placement_offers WHERE offer_id = $1 AND company_id = $2 RETURNING *`,
+    [offerId, companyId]
+  );
+  
+  return result.rows[0];
 }
 
 /* =========================
@@ -176,6 +242,8 @@ async function getOfferApplicants(companyId, offerId) {
     throw new Error("Offer not found or unauthorized");
   }
 
+  const driveId = offerRes.rows[0].drive_id;
+
   const result = await pool.query(
     `SELECT
        oa.application_id,
@@ -184,12 +252,13 @@ async function getOfferApplicants(companyId, offerId) {
        u.lname,
        s.department,
        s.cgpa,
-       oa.status
-     FROM offer_applications oa
-     JOIN students s ON s.user_id = oa.student_id
+       COALESCE(oa.status, 'offered') AS status
+     FROM drive_registrations dr
+     JOIN students s ON s.user_id = dr.student_id
      JOIN users u ON u.user_id = s.user_id
-     WHERE oa.offer_id = $1`,
-    [offerId]
+     LEFT JOIN offer_applications oa ON oa.student_id = dr.student_id AND oa.offer_id = $1
+     WHERE dr.drive_id = $2 AND dr.status = 'selected'`,
+    [offerId, driveId]
   );
   return result.rows;
 }
@@ -229,8 +298,10 @@ module.exports = {
   requestPlacementDrive,
   getFormOptions,
   getMyDrives,
+  deleteDrive,
   createOffer,
   getMyOffers,
+  deleteOffer,
   getDriveApplicants,
   updateApplicantStatus,
   getOfferApplicants,

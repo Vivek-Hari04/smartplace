@@ -253,6 +253,10 @@ async function checkStudentDriveEligibility(studentId, driveId) {
   }
   const student = studentRes.rows[0];
 
+  if (student.offers_received >= 2) {
+    return { eligible: false, reason: "Maximum number of offers received. Cannot participate in new drives." };
+  }
+
   // 2. Fetch drive
   const driveRes = await pool.query(
     `SELECT * FROM placement_drives WHERE drive_id = $1`,
@@ -469,14 +473,25 @@ async function applyForOffer(studentId, offerId) {
 
 async function getMyApplications(studentId) {
   const result = await pool.query(
-    `SELECT oa.*, po.title, po.package_lpa
-     FROM offer_applications oa
-     JOIN placement_offers po ON oa.offer_id = po.offer_id
-     WHERE oa.student_id = $1
-     ORDER BY oa.applied_at DESC`,
+    `SELECT
+       po.offer_id,
+       po.title,
+       po.package_lpa,
+       po.acceptance_deadline,
+       oa.status,
+       oa.application_id
+     FROM placement_offers po
+     JOIN placement_drives d ON d.drive_id = po.drive_id
+     JOIN drive_registrations dr ON dr.drive_id = d.drive_id
+     LEFT JOIN offer_applications oa ON oa.offer_id = po.offer_id AND oa.student_id = dr.student_id
+     WHERE dr.student_id = $1 AND dr.status = 'selected'`,
     [studentId]
   );
-  return result.rows;
+  
+  return result.rows.map(row => ({
+    ...row,
+    status: row.status || 'offered'
+  }));
 }
 
 async function getOfferStatus(studentId, applicationId) {
@@ -503,31 +518,66 @@ async function withdrawApplication(studentId, applicationId) {
   return result.rows[0];
 }
 
-async function respondToOffer(studentId, applicationId, decision) {
+async function respondToOffer(studentId, offerId, decision) {
   if (!['accepted', 'rejected'].includes(decision)) {
     throw new Error("Invalid decision");
   }
 
-  const appRes = await pool.query(
-    `SELECT * FROM offer_applications WHERE application_id = $1 AND student_id = $2`,
-    [applicationId, studentId]
+  const selectedCheck = await pool.query(
+    `SELECT dr.status FROM drive_registrations dr
+     JOIN placement_offers po ON po.drive_id = dr.drive_id
+     WHERE po.offer_id = $1 AND dr.student_id = $2`,
+    [offerId, studentId]
   );
 
-  if (appRes.rows.length === 0) {
-    throw new Error("Application not found");
+  if (selectedCheck.rows.length === 0 || selectedCheck.rows[0].status !== 'selected') {
+    throw new Error("Offer not available for this student");
   }
 
-  const updateRes = await pool.query(
-    `UPDATE offer_applications
-     SET status = $1, updated_at = NOW()
-     WHERE application_id = $2
-     RETURNING *`,
-    [decision, applicationId]
+  const existingApp = await pool.query(
+    `SELECT application_id, status FROM offer_applications WHERE offer_id = $1 AND student_id = $2`,
+    [offerId, studentId]
   );
 
-  if (decision === 'accepted') {
+  let updateRes;
+  let previousStatus = null;
+  
+  if (existingApp.rows.length > 0) {
+    previousStatus = existingApp.rows[0].status;
+    const setQuery = decision === 'accepted' 
+      ? `SET status = $1, updated_at = NOW(), accepted_at = NOW()`
+      : `SET status = $1, updated_at = NOW()`;
+
+    updateRes = await pool.query(
+      `UPDATE offer_applications
+       ${setQuery}
+       WHERE application_id = $2
+       RETURNING *`,
+      [decision, existingApp.rows[0].application_id]
+    );
+  } else {
+    // Prevent duplicate insertion race condition
+    const query = decision === 'accepted'
+      ? `INSERT INTO offer_applications (offer_id, student_id, status, applied_at, updated_at, accepted_at) 
+         SELECT $1, $2, $3, NOW(), NOW(), NOW() 
+         WHERE NOT EXISTS (SELECT 1 FROM offer_applications WHERE offer_id = $1 AND student_id = $2)
+         RETURNING *`
+      : `INSERT INTO offer_applications (offer_id, student_id, status, applied_at, updated_at) 
+         SELECT $1, $2, $3, NOW(), NOW()
+         WHERE NOT EXISTS (SELECT 1 FROM offer_applications WHERE offer_id = $1 AND student_id = $2)
+         RETURNING *`;
+    
+    updateRes = await pool.query(query, [offerId, studentId, decision]);
+    if (updateRes.rows.length === 0) throw new Error("Concurrent duplicate request detected.");
+  }
+
+  // Prevents incrementing multiple times
+  if (decision === 'accepted' && previousStatus !== 'accepted') {
     await pool.query(
-      `UPDATE students SET placement_eligible = false, placement_status = 'PLACED' WHERE user_id = $1`,
+      `UPDATE students 
+       SET offers_received = offers_received + 1, 
+           placement_status = 'PLACED' 
+       WHERE user_id = $1`,
       [studentId]
     );
   }

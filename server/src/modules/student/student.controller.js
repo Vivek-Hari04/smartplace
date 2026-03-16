@@ -276,35 +276,10 @@ async function getDriveStatus(req, res) {
    OFFERS
 ========================= */
 
-async function getEligibleOffers(req, res) {
-  try {
-    const data = await studentService.getEligibleOffers(req.user.id);
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-}
-
-async function applyForOffer(req, res) {
-  try {
-    const { offerId } = req.body;
-    const data = await studentService.applyForOffer(
-      req.user.id,
-      offerId
-    );
-    res.status(201).json(data);
-  } catch (err) {
-    if (err.message === "You are not selected for this drive" || err.message === "You have already applied for this offer") {
-      return res.status(403).json({ error: err.message });
-    }
-    res.status(400).json({ error: err.message });
-  }
-}
-
 async function respondToOffer(req, res) {
   try {
-    const { applicationId, decision } = req.body;
-    const data = await studentService.respondToOffer(req.user.id, applicationId, decision);
+    const { offerId, decision } = req.body;
+    const data = await studentService.respondToOffer(req.user.id, offerId, decision);
     res.status(200).json(data);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -378,8 +353,6 @@ module.exports = {
   cancelSlot,
   getMyBookedSlots,
   getDriveStatus,
-  getEligibleOffers,
-  applyForOffer,
   respondToOffer,
   getMyApplications,
   getOfferStatus,

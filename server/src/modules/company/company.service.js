@@ -137,10 +137,14 @@ async function deleteDrive(companyId, driveId) {
 
 async function createOffer(userId, offerData) {
   const { drive_id, title, description, package_lpa, location, acceptance_deadline } = offerData;
-  
+
   // Verify drive belongs to company and is approved
   const driveCheck = await pool.query(
-    `SELECT 1 FROM placement_drives WHERE drive_id = $1 AND company_id = $2 AND status = 'APPROVED'`,
+    `SELECT 1 
+     FROM placement_drives 
+     WHERE drive_id = $1 
+     AND company_id = $2 
+     AND status = 'APPROVED'`,
     [drive_id, userId]
   );
 
@@ -148,6 +152,7 @@ async function createOffer(userId, offerData) {
     throw new Error("Invalid drive ID or drive not yet approved by admin.");
   }
 
+  // Create offer
   const result = await pool.query(
     `INSERT INTO placement_offers 
      (drive_id, company_id, title, description, package_lpa, location, acceptance_deadline)
@@ -155,7 +160,23 @@ async function createOffer(userId, offerData) {
      RETURNING *`,
     [drive_id, userId, title, description, package_lpa, location, acceptance_deadline]
   );
-  return result.rows[0];
+
+  const offer = result.rows[0];
+
+  // Increment offers_received for students selected in this drive
+  await pool.query(
+    `UPDATE students
+     SET offers_received = offers_received + 1
+     WHERE user_id IN (
+       SELECT student_id
+       FROM drive_registrations
+       WHERE drive_id = $1
+       AND status = 'selected'
+     )`,
+    [drive_id]
+  );
+
+  return offer;
 }
 
 async function getMyOffers(userId) {

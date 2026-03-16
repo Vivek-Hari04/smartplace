@@ -253,6 +253,10 @@ async function checkStudentDriveEligibility(studentId, driveId) {
   }
   const student = studentRes.rows[0];
 
+  if (student.placement_status === 'PLACED') {
+    return { eligible: false, reason: "Student already placed. Cannot register for placement drives." };
+  }
+
   if (student.offers_received >= 2) {
     return { eligible: false, reason: "Maximum number of offers received. Cannot participate in new drives." };
   }

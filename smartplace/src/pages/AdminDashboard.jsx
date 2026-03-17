@@ -4,7 +4,47 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import '../styles/Dashboard.css';
 import DashboardLayout from '../components/layout/DashboardLayout';
- 
+
+const escapeCSV = (value) =>
+  `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+const generateCSV = (data, filename) => {
+  if (!data || data.length === 0) return;
+
+  const headers = ["Name","Email","Department","CGPA","Status"];
+
+  const rows = data.map(s => [
+    escapeCSV(s.fname),
+    escapeCSV(s.email),
+    escapeCSV(s.department),
+    escapeCSV(s.cgpa),
+    escapeCSV(
+      s.placement_eligible !== undefined
+        ? (s.placement_eligible ? "Eligible" : "Not Eligible")
+        : (s.status || "")
+    )
+  ]);
+
+  const csvContent =
+    [headers, ...rows]
+      .map(row => row.join(","))
+      .join("\n");
+
+  const blob = new Blob([csvContent], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.setAttribute("download", filename);
+
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
 export default function AdminDashboard({ user, accessToken }) {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(true);
@@ -36,6 +76,7 @@ export default function AdminDashboard({ user, accessToken }) {
   const [placementEligible, setPlacementEligible] = useState('All');
   const [filteredStudents, setFilteredStudents] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [attendeeStatusFilter, setAttendeeStatusFilter] = useState('All');
 
   const api = useMemo(() => {
     return axios.create({
@@ -216,7 +257,11 @@ export default function AdminDashboard({ user, accessToken }) {
   };
 
   const handleDownloadPDF = () => {
-    if (!selectedDrive || registrants.length === 0) return;
+    const registrantsToDownload = attendeeStatusFilter === 'All' 
+      ? registrants 
+      : registrants.filter(r => r.status.toLowerCase() === attendeeStatusFilter.toLowerCase());
+      
+    if (!selectedDrive || registrantsToDownload.length === 0) return;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -235,7 +280,7 @@ export default function AdminDashboard({ user, accessToken }) {
 
     // Prepare Table Data
     const tableColumn = ["#", "Name", "Email", "Department", "CGPA", "Status"];
-    const tableRows = registrants.map((r, index) => [
+    const tableRows = registrantsToDownload.map((r, index) => [
       index + 1,
       `${r.fname} ${r.lname}`,
       r.email,
@@ -294,6 +339,11 @@ export default function AdminDashboard({ user, accessToken }) {
       return true;
     });
   }, [allDrives, driveSubTab]);
+
+  const filteredRegistrants = useMemo(() => {
+    if (attendeeStatusFilter === 'All') return registrants;
+    return registrants.filter(r => r.status.toLowerCase() === attendeeStatusFilter.toLowerCase());
+  }, [registrants, attendeeStatusFilter]);
 
   return (
     <DashboardLayout
@@ -707,16 +757,33 @@ export default function AdminDashboard({ user, accessToken }) {
                     </div>
                   )}
 
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <h3 style={{ margin: 0 }}>Registered Students</h3>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={handleDownloadPDF}
-                      disabled={registrants.length === 0}
-                      style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                      <span style={{ fontSize: '1.2rem' }}>📄</span> Download Attendee PDF
-                    </button>
+                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                      <select 
+                        className="form-input"
+                        value={attendeeStatusFilter}
+                        onChange={e => setAttendeeStatusFilter(e.target.value)}
+                        style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', minWidth: '150px' }}
+                      >
+                        <option value="All">All Statuses</option>
+                        <option value="Registered">Registered</option>
+                        <option value="Shortlisted">Shortlisted</option>
+                        <option value="Selected">Selected</option>
+                        <option value="Rejected">Rejected</option>
+                      </select>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={handleDownloadPDF}
+                        disabled={filteredRegistrants.length === 0}
+                        style={{ padding: '0.6rem 1.2rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                      >
+                        <span style={{ fontSize: '1.2rem' }}>📄</span> Download Attendee PDF
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => generateCSV(filteredRegistrants, "drive_attendees.csv")} disabled={filteredRegistrants.length === 0}>
+                        Download CSV
+                      </button>
+                    </div>
                   </div>
                   <table className="data-table">
                     <thead>
@@ -728,10 +795,10 @@ export default function AdminDashboard({ user, accessToken }) {
                       </tr>
                     </thead>
                     <tbody>
-                      {registrants.length === 0 ? (
-                        <tr><td colSpan={4} style={{textAlign:'center', padding: '3rem'}}>No students registered yet</td></tr>
+                      {filteredRegistrants.length === 0 ? (
+                        <tr><td colSpan={4} style={{textAlign:'center', padding: '3rem'}}>No matching registrants</td></tr>
                       ) : (
-                        registrants.map(r => (
+                        filteredRegistrants.map(r => (
                           <tr key={r.registration_id}>
                             <td>
                               <strong>{r.fname} {r.lname}</strong>
@@ -942,6 +1009,9 @@ export default function AdminDashboard({ user, accessToken }) {
                 </button>
                 <button className="btn btn-secondary" onClick={handleDownloadFilteredPDF} disabled={filteredStudents.length === 0}>
                   Download PDF
+                </button>
+                <button onClick={() => generateCSV(filteredStudents, "students.csv")}>
+                  Download CSV
                 </button>
               </div>
 

@@ -127,14 +127,28 @@ async function getUpcomingAssessments(studentId) {
             a.title,
             a.description,
             a.deadline,
-            c.name AS course_name
+            c.name AS course_name,
+            s.submission_url,
+            s.score,
+            s.feedback,
+            s.submitted_at,
+            CASE 
+              WHEN s.score IS NULL THEN 'NOT_EVALUATED'
+              ELSE 'EVALUATED'
+            END AS evaluation_status,
+            CASE 
+              WHEN s.submitted_at IS NOT NULL AND s.submitted_at > a.deadline THEN true
+              WHEN s.submitted_at IS NULL AND NOW() > a.deadline THEN true
+              ELSE false
+            END AS is_late
      FROM assessments a
      JOIN courses c 
        ON a.course_id = c.course_id
      JOIN enrollments e 
        ON e.course_id = a.course_id
+     LEFT JOIN assessment_submissions s
+       ON a.assessment_id = s.assessment_id AND s.student_id = $1
      WHERE e.student_id = $1
-       AND a.deadline > NOW()
      ORDER BY a.deadline ASC`,
     [studentId]
   );
@@ -148,12 +162,27 @@ async function getAssessmentDetails(studentId, assessmentId) {
             a.title,
             a.description,
             a.deadline,
-            c.name AS course_name
+            c.name AS course_name,
+            s.submission_url,
+            s.score,
+            s.feedback,
+            s.submitted_at,
+            CASE 
+              WHEN s.score IS NULL THEN 'NOT_EVALUATED'
+              ELSE 'EVALUATED'
+            END AS evaluation_status,
+            CASE 
+              WHEN s.submitted_at IS NOT NULL AND s.submitted_at > a.deadline THEN true
+              WHEN s.submitted_at IS NULL AND NOW() > a.deadline THEN true
+              ELSE false
+            END AS is_late
      FROM assessments a
      JOIN courses c 
        ON a.course_id = c.course_id
      JOIN enrollments e 
        ON e.course_id = a.course_id
+     LEFT JOIN assessment_submissions s
+       ON a.assessment_id = s.assessment_id AND s.student_id = $2
      WHERE a.assessment_id = $1
      AND e.student_id = $2`,
     [assessmentId, studentId]
@@ -347,13 +376,34 @@ async function sendDoubtMessage(doubtId, senderId, senderRole, message) {
 async function updateDoubtStatus(doubtId, status) {
   const result = await pool.query(
     `UPDATE doubts
-     SET status = $1
+     SET status = $1,
+         resolved_at = CASE WHEN $1 = 'RESOLVED' THEN NOW() ELSE NULL END
      WHERE doubt_id = $2
      RETURNING *`,
     [status, doubtId]
   );
 
   return result.rows[0];
+}
+
+async function deleteDoubt(studentId, doubtId) {
+  const verify = await pool.query(
+    `SELECT status FROM doubts WHERE doubt_id = $1 AND student_id = $2`,
+    [doubtId, studentId]
+  );
+
+  if (verify.rowCount === 0) {
+    throw new Error("Doubt not found or unauthorized");
+  }
+
+  if (verify.rows[0].status !== 'RESOLVED') {
+    throw new Error("Only resolved doubts can be deleted");
+  }
+
+  await pool.query(
+    `DELETE FROM doubts WHERE doubt_id = $1 AND student_id = $2`,
+    [doubtId, studentId]
+  );
 }
 
 
@@ -785,5 +835,6 @@ module.exports = {
   getDoubtMessages,
   sendDoubtMessage,
   updateDoubtStatus,
-  markMessagesAsRead
+  markMessagesAsRead,
+  deleteDoubt
 };

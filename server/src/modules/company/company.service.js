@@ -94,43 +94,55 @@ async function getMyDrives(userId) {
 }
 
 async function deleteDrive(companyId, driveId) {
-  // Validate ownership
-  const driveCheck = await pool.query(
-    `SELECT 1 FROM placement_drives WHERE drive_id = $1 AND company_id = $2`,
-    [driveId, companyId]
-  );
+  const client = await pool.connect();
 
-  if (driveCheck.rows.length === 0) {
-    throw new Error("Invalid drive ID or unauthorized");
+  try {
+    await client.query("BEGIN");
+
+    // 🔒 Validate ownership
+    const driveCheck = await client.query(
+      `SELECT 1 
+       FROM placement_drives 
+       WHERE drive_id = $1 AND company_id = $2`,
+      [driveId, companyId]
+    );
+
+    if (driveCheck.rows.length === 0) {
+      throw new Error("Invalid drive ID or unauthorized");
+    }
+
+    // 🔥 DO NOT DELETE OFFERS
+    // DB (ON DELETE SET NULL) will handle this automatically
+
+    // 🔥 DO NOT DELETE APPLICATIONS
+    // They remain tied to offers
+
+    // 🔥 Delete registrations (these depend on drive)
+    await client.query(
+      `DELETE FROM drive_registrations 
+       WHERE drive_id = $1`,
+      [driveId]
+    );
+
+    // 🔥 Delete drive → offers.drive_id becomes NULL automatically
+    const result = await client.query(
+      `DELETE FROM placement_drives 
+       WHERE drive_id = $1 AND company_id = $2
+       RETURNING *`,
+      [driveId, companyId]
+    );
+
+    await client.query("COMMIT");
+
+    return result.rows[0];
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
-
-  // Delete all offer applications for offers tied to this drive
-  await pool.query(
-    `DELETE FROM offer_applications WHERE offer_id IN (SELECT offer_id FROM placement_offers WHERE drive_id = $1)`,
-    [driveId]
-  );
-
-  // Delete all placement offers tied to this drive
-  await pool.query(
-    `DELETE FROM placement_offers WHERE drive_id = $1`,
-    [driveId]
-  );
-
-  // Delete all registrations for this drive
-  await pool.query(
-    `DELETE FROM drive_registrations WHERE drive_id = $1`,
-    [driveId]
-  );
-
-  // Delete the drive itself
-  const result = await pool.query(
-    `DELETE FROM placement_drives WHERE drive_id = $1 AND company_id = $2 RETURNING *`,
-    [driveId, companyId]
-  );
-
-  return result.rows[0];
 }
-
 /* =========================
    PLACEMENT OFFERS
 ========================= */

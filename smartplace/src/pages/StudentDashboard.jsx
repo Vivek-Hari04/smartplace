@@ -540,24 +540,47 @@ const sendMessage = async () => {
                     {selectedDoubt.status}
                   </span>
                 </div>
-                {selectedDoubt.status !== "RESOLVED" && (
-                  <button
-                    className="btn btn-success"
-                    onClick={async () => {
-                      try {
-                        await api.put(`/doubts/${selectedDoubt.doubt_id}/status`, { status: "RESOLVED" });
-                        setSelectedDoubt(prev => ({ ...prev, status: "RESOLVED" }));
-                        setDoubts(prev => prev.map(d => 
-                          d.doubt_id === selectedDoubt.doubt_id ? { ...d, status: "RESOLVED" } : d
-                        ));
-                      } catch (err) {
-                        alert("Failed to update status");
-                      }
-                    }}
-                  >
-                    Mark as Resolved
-                  </button>
-                )}
+                
+                <div style={{ display: "flex", gap: "10px" }}>
+                  {selectedDoubt.status !== "RESOLVED" && (
+                    <button
+                      className="btn btn-success"
+                      onClick={async () => {
+                        try {
+                          await api.put(`/doubts/${selectedDoubt.doubt_id}/status`, { status: "RESOLVED" });
+                          setSelectedDoubt(prev => ({ ...prev, status: "RESOLVED" }));
+                          setDoubts(prev => prev.map(d => 
+                            d.doubt_id === selectedDoubt.doubt_id ? { ...d, status: "RESOLVED" } : d
+                          ));
+                        } catch (err) {
+                          alert("Failed to update status");
+                        }
+                      }}
+                    >
+                      Mark as Resolved
+                    </button>
+                  )}
+
+                  {selectedDoubt.status === "RESOLVED" && (
+                    <button
+                      className="btn btn-danger"
+                      onClick={async () => {
+                        if (!window.confirm("Are you sure you want to delete this doubt?")) return;
+                        try {
+                          await api.delete(`/doubts/${selectedDoubt.doubt_id}`);
+                          
+                          // UI UPDATE: Remove without reloading
+                          setDoubts(prev => prev.filter(d => d.doubt_id !== selectedDoubt.doubt_id));
+                          setSelectedDoubt(null);
+                        } catch (err) {
+                          alert("Failed to delete doubt");
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div
@@ -684,35 +707,42 @@ const sendMessage = async () => {
               <th>Topic</th>
               <th>Course</th>
               <th>Deadline</th>
+              <th>Status</th>
               <th>Action</th>
             </tr>
           </thead>
           <tbody>
-            {assessments.length === 0 ? <tr><td colSpan={4} style={{ textAlign: 'center' }}>No assessments found</td></tr> :
+            {assessments.length === 0 ? <tr><td colSpan={5} style={{ textAlign: 'center' }}>No assessments found</td></tr> :
               assessments.map((a) => (
                 <tr key={a.assessment_id}>
-                  <td>{a.title}</td>
+                  <td>
+                    {a.title}
+                    {a.is_late && <span className="status-badge" style={{ backgroundColor: '#fee2e2', color: '#dc2626', marginLeft: '0.5rem', padding: '0.1rem 0.4rem', fontSize: '10px' }}>LATE</span>}
+                  </td>
                   <td>{a.course_name}</td>
                   <td>{new Date(a.deadline).toLocaleString()}</td>
                   <td>
-                    {a.score !== undefined && a.score !== null ? (
-                      <span>Score: {a.score}</span>
+                    {a.evaluation_status === 'EVALUATED' ? (
+                      <span className="status-badge" style={{ backgroundColor: '#dcfce7', color: '#16a34a' }}>Evaluated</span>
                     ) : (
-                      <button
-                        className="btn btn-primary btn-sm"
-                        onClick={async () => {
-                          try {
-                            const res = await api.get(`/assessments/${a.assessment_id}`);
-                            setCurrentAssessmentData(res.data);
-                            setIsSubmissionModalOpen(true);
-                          } catch (err) {
-                            alert("Failed to fetch assessment details.");
-                          }
-                        }}
-                      >
-                        Start Test
-                      </button>
+                      <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#d97706' }}>Not Evaluated</span>
                     )}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={async () => {
+                        try {
+                          const res = await api.get(`/assessments/${a.assessment_id}`);
+                          setCurrentAssessmentData(res.data);
+                          setIsSubmissionModalOpen(true);
+                        } catch (err) {
+                          alert("Failed to fetch assessment details.");
+                        }
+                      }}
+                    >
+                      View Details
+                    </button>
                   </td>
                 </tr>
               ))
@@ -1167,11 +1197,17 @@ const sendMessage = async () => {
         </div>
       )}
 
-      {/* START TEST MODAL */}
+      {/* VIEW DETAILS / SUBMISSION MODAL */}
       {isSubmissionModalOpen && currentAssessmentData && (
         <div className="modal-overlay">
           <div className="modal-content">
-            <h2>{currentAssessmentData.title}</h2>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {currentAssessmentData.title}
+              {currentAssessmentData.is_late && <span className="status-badge" style={{ backgroundColor: '#fee2e2', color: '#dc2626', fontSize: '12px' }}>LATE</span>}
+            </h2>
+            <p style={{ marginTop: "0.5rem", marginBottom: "0.5rem", color: "#6b7280" }}>
+              <strong>Course:</strong> {currentAssessmentData.course_name}
+            </p>
             <p style={{ marginTop: "0.5rem", marginBottom: "0.5rem", color: "#6b7280" }}>
               <strong>Description / Instructions:</strong> {currentAssessmentData.description || "No description provided."}
             </p>
@@ -1179,41 +1215,104 @@ const sendMessage = async () => {
               <strong>Deadline:</strong> {new Date(currentAssessmentData.deadline).toLocaleString()}
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <input
-                className="form-input"
-                type="url"
-                placeholder="Paste your submission link (e.g., GitHub, Drive)"
-                value={submissionUrl}
-                onChange={(e) => setSubmissionUrl(e.target.value)}
-              />
-              <div style={{ display: "flex", gap: "1rem" }}>
-                <button
-                  className="btn btn-primary"
-                  onClick={async () => {
-                    try {
-                      await api.post(`/assessments/${currentAssessmentData.assessment_id}/submit`, { submission_link: submissionUrl });
-                      alert("Assessment submitted successfully!");
+            <hr style={{ margin: "20px 0" }} />
+
+            {/* EVALUATION SECTION */}
+            <div style={{ marginBottom: "20px" }}>
+              <h4 style={{ marginBottom: "10px" }}>Evaluation</h4>
+              {currentAssessmentData.evaluation_status === 'EVALUATED' ? (
+                <div style={{ padding: "10px", backgroundColor: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "8px" }}>
+                  <p><strong>Grade:</strong> <span style={{ color: "#16a34a", fontSize: "18px", fontWeight: "bold" }}>{currentAssessmentData.score}</span></p>
+                  {currentAssessmentData.feedback && (
+                    <p style={{ marginTop: "10px" }}><strong>Feedback:</strong> {currentAssessmentData.feedback}</p>
+                  )}
+                </div>
+              ) : (
+                <p style={{ color: "#6b7280", fontStyle: "italic", margin: 0 }}>Not evaluated yet</p>
+              )}
+            </div>
+
+            <hr style={{ margin: "20px 0" }} />
+
+            {/* SUBMISSION SECTION */}
+            <div>
+              <h4 style={{ marginBottom: "10px" }}>Your Submission</h4>
+              {currentAssessmentData.submission_url ? (
+                <p style={{ margin: 0 }}>
+                  <a href={currentAssessmentData.submission_url} target="_blank" rel="noopener noreferrer" style={{ color: "#2563eb", textDecoration: "underline", fontWeight: "600" }}>
+                    View Submission
+                  </a>
+                  <span style={{ marginLeft: "10px", color: "#6b7280", fontSize: "12px" }}>
+                    (Submitted on {new Date(currentAssessmentData.submitted_at).toLocaleString()})
+                  </span>
+                </p>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                  <input
+                    className="form-input"
+                    type="url"
+                    placeholder="Paste your submission link (e.g., GitHub, Drive)"
+                    value={submissionUrl}
+                    onChange={(e) => setSubmissionUrl(e.target.value)}
+                  />
+                  <div style={{ display: "flex", gap: "1rem" }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        if (!submissionUrl) {
+                          alert("Please enter a valid URL");
+                          return;
+                        }
+
+                        try {
+                          const res = await api.post(`/assessments/${currentAssessmentData.assessment_id}/submit`, { submission_link: submissionUrl });
+                          
+                          // Instant UI update
+                          const newSubmissionData = {
+                            ...currentAssessmentData,
+                            submission_url: res.data.submission_url || submissionUrl,
+                            submitted_at: res.data.submitted_at || new Date().toISOString()
+                          };
+                          
+                          setCurrentAssessmentData(newSubmissionData);
+                          // Update the list as well to reflect changes immediately
+                          setAssessments(prev => prev.map(a => 
+                            a.assessment_id === currentAssessmentData.assessment_id ? { ...a, ...newSubmissionData } : a
+                          ));
+                          
+                          setSubmissionUrl("");
+                          alert("Assessment submitted successfully!");
+                        } catch (err) {
+                          alert(handleError(err));
+                        }
+                      }}
+                    >
+                      Submit
+                    </button>
+                    <button className="btn btn-secondary" onClick={() => {
                       setIsSubmissionModalOpen(false);
                       setSubmissionUrl("");
-                      // Optionally refresh history
-                      const res = await api.get("/assessments/history");
-                      setAssessments(res.data);
-                    } catch (err) {
-                      alert("Failed to submit assessment.");
-                    }
+                    }}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {currentAssessmentData.submission_url && (
+              <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsSubmissionModalOpen(false);
+                    setSubmissionUrl("");
                   }}
                 >
-                  Submit
-                </button>
-                <button className="btn btn-secondary" onClick={() => {
-                  setIsSubmissionModalOpen(false);
-                  setSubmissionUrl("");
-                }}>
-                  Cancel
+                  Close
                 </button>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

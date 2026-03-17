@@ -399,6 +399,18 @@ async function updateDoubtStatus(req, res) {
   }
 }
 
+async function deleteDoubt(req, res) {
+  try {
+    const studentId = req.user.id;
+    const { doubtId } = req.params;
+
+    await studentService.deleteDoubt(studentId, doubtId);
+
+    res.status(200).json({ message: "Doubt deleted successfully" });
+  } catch (err) {
+    res.status(403).json({ error: err.message });
+  }
+}
 
 
 
@@ -435,5 +447,6 @@ module.exports = {
   getStudentDoubts,
   getDoubtMessages,
   sendDoubtMessage,
-  updateDoubtStatus
+  updateDoubtStatus,
+  deleteDoubt
 };

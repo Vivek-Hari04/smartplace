@@ -234,4 +234,12 @@ router.put(
   authMiddleware,
   studentController.updateDoubtStatus
 );
+
+// Delete a resolved doubt
+router.delete(
+  "/doubts/:doubtId",
+  authMiddleware,
+  studentController.deleteDoubt
+);
+
 module.exports = router;

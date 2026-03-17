@@ -3,25 +3,29 @@ import axios from 'axios';
 
 export default function Onboarding({ user, role, accessToken, onComplete }) {
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState(
-    role === 'student' ? {
-      department: '',
-      graduation_year: new Date().getFullYear() + 2,
-      cgpa: ''
-    } : {
-      company_name: '',
-      website: '',
-      industry: '',
-      description: '',
-      contact_person: ''
+  
+  const getInitialFormData = () => {
+    if (role === 'student') {
+      return { department: '', graduation_year: new Date().getFullYear() + 2, cgpa: '' };
+    } else if (role === 'company') {
+      return { company_name: '', website: '', industry: '', description: '', contact_person: '' };
+    } else if (role === 'alumni') {
+      return { company: '', graduation_year: new Date().getFullYear() - 1 };
     }
-  );
+    return {};
+  };
+
+  const [formData, setFormData] = useState(getInitialFormData());
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const endpoint = role === 'student' ? '/student/profile' : '/company/profile';
+      let endpoint = '';
+      if (role === 'student') endpoint = '/student/profile';
+      else if (role === 'company') endpoint = '/company/profile';
+      else if (role === 'alumni') endpoint = '/alumni/profile';
+
       await axios.put(`${import.meta.env.VITE_API_URL}${endpoint}`, formData, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
@@ -50,7 +54,7 @@ export default function Onboarding({ user, role, accessToken, onComplete }) {
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {role === 'student' ? (
+          {role === 'student' && (
             <>
               <div className="form-group">
                 <label>Department</label>
@@ -74,7 +78,28 @@ export default function Onboarding({ user, role, accessToken, onComplete }) {
                 />
               </div>
             </>
-          ) : (
+          )}
+
+          {role === 'alumni' && (
+            <>
+              <div className="form-group">
+                <label>Current Company</label>
+                <input 
+                  type="text" className="form-input" required placeholder="e.g. Google, Microsoft"
+                  value={formData.company} onChange={e => setFormData({...formData, company: e.target.value})}
+                />
+              </div>
+              <div className="form-group">
+                <label>Batch (Graduation Year)</label>
+                <input 
+                  type="number" className="form-input" required
+                  value={formData.graduation_year} onChange={e => setFormData({...formData, graduation_year: e.target.value})}
+                />
+              </div>
+            </>
+          )}
+
+          {role === 'company' && (
             <>
               <div className="form-group">
                 <label>Company Name</label>

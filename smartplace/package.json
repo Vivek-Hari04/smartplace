@@ -12,8 +12,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.96.0",
     "axios": "^1.13.6",
-    "jspdf": "^4.2.0",
-    "jspdf-autotable": "^5.0.7",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

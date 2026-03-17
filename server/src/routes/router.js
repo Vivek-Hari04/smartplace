@@ -8,11 +8,13 @@ const advisorRoutes = require("../modules/faculty/advisor.routes");
 const studentRoutes = require("../modules/student/student.routes");
 const adminRoutes = require("../modules/admin/admin.routes");
 const companyRoutes = require("../modules/company/company.routes");
+const alumniRoutes = require("../modules/alumni/alumni.routes");
 
 router.use("/faculty", facultyRoutes);
 router.use("/advisor", advisorRoutes);
 router.use("/student",studentRoutes);
 router.use("/admin", adminRoutes);
 router.use("/company", companyRoutes);
+router.use("/alumni", alumniRoutes);
 
 module.exports = router;

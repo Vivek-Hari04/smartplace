@@ -110,11 +110,11 @@ router.post(
   studentController.submitAssessment
 );
 
-router.get(
-  "/assessments/:assessmentId/submission",
-  authMiddleware,
-  studentController.getAssessmentSubmission
-);
+// router.get(
+//   "/assessments/:assessmentId/submission",
+//   authMiddleware,
+//   studentController.getAssessmentSubmission
+// );
 
 /* =========================
    PLACEMENT SLOTS
@@ -202,4 +202,36 @@ router.get(
   studentController.getOfferHistory
 );
 
+
+/* =========================
+   DOUBT CHAT SYSTEM
+========================= */
+
+// Get all doubts (threads)
+router.get(
+  "/doubts",
+  authMiddleware,
+  studentController.getStudentDoubts
+);
+
+// Get messages for a doubt
+router.get(
+  "/doubts/:doubtId/messages",
+  authMiddleware,
+  studentController.getDoubtMessages
+);
+
+// Send message in a doubt
+router.post(
+  "/doubts/:doubtId/message",
+  authMiddleware,
+  studentController.sendDoubtMessage
+);
+
+// Update doubt status (RESOLVED / UNRESOLVED)
+router.put(
+  "/doubts/:doubtId/status",
+  authMiddleware,
+  studentController.updateDoubtStatus
+);
 module.exports = router;

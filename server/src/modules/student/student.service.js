@@ -1,8 +1,6 @@
 const pool = require("../../config/db");
 
-/* =========================
-   STUDENT PROFILE
-========================= */
+/*STUDENT PROFILE*/
 
 async function getStudentProfile(userId) {
   const result = await pool.query(
@@ -44,9 +42,7 @@ async function updateStudentProfile(userId, updateData) {
   return result.rows[0];
 }
 
-/* =========================
-   COURSES
-========================= */
+/*COURSES*/
 
 async function getEnrolledCourses(userId) {
   const result = await pool.query(
@@ -250,15 +246,89 @@ async function getAssessmentHistory(studentId) {
   return result.rows;
 }
 
-async function submitDoubt(studentId, courseId, doubtText) {
+async function submitDoubt(studentId, courseId, message) {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    // 1. Create doubt thread (NO message stored)
+    const doubtRes = await client.query(
+      `INSERT INTO doubts (student_id, course_id)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [studentId, courseId]
+    );
+
+    const doubt = doubtRes.rows[0];
+
+    // 2. Insert FIRST message into chat table
+    await client.query(
+      `INSERT INTO doubt_responses (doubt_id, sender_id, sender_role, message)
+       VALUES ($1, $2, 'student', $3)`,
+      [doubt.doubt_id, studentId, message]
+    );
+
+    await client.query("COMMIT");
+
+    return doubt;
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function getStudentDoubts(studentId) {
   const result = await pool.query(
-    `INSERT INTO doubts (student_id, course_id, question)
-     VALUES ($1, $2, $3)
-     RETURNING *`,
-    [studentId, courseId, doubtText]
+    `SELECT d.doubt_id, d.status, d.created_at
+     FROM doubts d
+     WHERE d.student_id = $1
+     ORDER BY d.created_at DESC`,
+    [studentId]
   );
+
+  return result.rows;
+}
+
+async function getDoubtMessages(doubtId) {
+  const result = await pool.query(
+    `SELECT dr.*, u.fname, u.lname
+     FROM doubt_responses dr
+     JOIN users u ON dr.sender_id = u.user_id
+     WHERE dr.doubt_id = $1
+     ORDER BY dr.created_at ASC`,
+    [doubtId]
+  );
+
+  return result.rows;
+}
+
+async function sendDoubtMessage(doubtId, senderId, senderRole, message) {
+  const result = await pool.query(
+    `INSERT INTO doubt_responses (doubt_id, sender_id, sender_role, message)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [doubtId, senderId, senderRole, message]
+  );
+
   return result.rows[0];
 }
+
+async function updateDoubtStatus(doubtId, status) {
+  const result = await pool.query(
+    `UPDATE doubts
+     SET status = $1
+     WHERE doubt_id = $2
+     RETURNING *`,
+    [status, doubtId]
+  );
+
+  return result.rows[0];
+}
+
 
 /* =========================
    PLACEMENT SLOTS
@@ -682,5 +752,10 @@ module.exports = {
   withdrawApplication,
   respondToOffer,
   getOfferHistory,
-  submitDoubt
+  //newly added
+  submitDoubt,
+  getStudentDoubts,
+  getDoubtMessages,
+  sendDoubtMessage,
+  updateDoubtStatus
 };

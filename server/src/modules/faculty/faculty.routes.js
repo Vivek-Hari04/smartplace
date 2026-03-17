@@ -28,12 +28,12 @@ router.get("/courses/:id/materials", facultyController.getMaterials);
 router.put("/materials/:id", facultyController.updateMaterial);
 router.delete("/materials/:id", facultyController.deleteMaterial);
 
-// Doubts
+/* Doubts
 router.get("/courses/:id/doubts", facultyController.getCourseDoubts);
 router.get("/doubts", facultyController.getDoubts);
 router.get("/doubts/:id", facultyController.getDoubtById);
 router.post("/doubts/:id/respond", facultyController.respondToDoubt);
-router.patch("/doubts/:id/reopen", facultyController.reopenDoubt);
+router.patch("/doubts/:id/reopen", facultyController.reopenDoubt); */
 
 // Assessments
 router.post("/courses/:id/assessments", facultyController.createAssessment);
@@ -42,5 +42,15 @@ router.get("/assessments/:id/submissions", facultyController.getSubmissions);
 router.patch("/submissions/:id/evaluate", facultyController.evaluateSubmission);
 router.get("/assessments/:id/report", facultyController.generateReport);
 router.delete("/assessments/:id", facultyController.deleteAssessment);
+
+// DOUBT CHAT SYSTEM
+
+router.get("/doubts", facultyController.getFacultyDoubts);
+
+router.get("/doubts/:doubtId/messages", facultyController.getDoubtMessages);
+
+router.post("/doubts/:doubtId/message", facultyController.sendDoubtMessage);
+
+router.put("/doubts/:doubtId/status", facultyController.updateDoubtStatus);
 
 module.exports = router;

@@ -202,35 +202,27 @@ exports.deleteMaterial = async (facultyId, materialId) => {
   }
 };
 
-/*DOUBTS*/
+//DOUBT CHAT SYSTEM
 
-exports.getDoubts = async (facultyId) => {
+// Get all doubts (threads) for faculty courses
+exports.getFacultyDoubts = async (facultyId) => {
   const result = await pool.query(
-    `SELECT d.*
+    `SELECT d.doubt_id, d.course_id, d.status, d.created_at
      FROM doubts d
      JOIN courses c ON c.course_id = d.course_id
-     WHERE c.faculty_id = $1`,
+     WHERE c.faculty_id = $1
+     ORDER BY d.created_at DESC`,
     [facultyId]
   );
 
   return result.rows;
 };
 
-exports.getCourseDoubts = async (facultyId, courseId) => {
-  const result = await pool.query(
-    `SELECT d.*, u.fname, u.lname
-     FROM doubts d
-     JOIN courses c ON c.course_id = d.course_id
-     JOIN students s ON s.user_id = d.student_id
-     JOIN users u ON u.user_id = s.user_id
-     WHERE c.faculty_id = $1 AND d.course_id = $2
-     ORDER BY d.created_at DESC`,
-    [facultyId, courseId]
-  );
-  return result.rows;
-};
 
-exports.respondToDoubt = async (facultyId, doubtId, response) => {
+// Get chat messages for a doubt (ONLY if faculty owns the course)
+exports.getDoubtMessages = async (facultyId, doubtId) => {
+
+  // 🔒 Authorization check
   const check = await pool.query(
     `SELECT 1
      FROM doubts d
@@ -240,24 +232,74 @@ exports.respondToDoubt = async (facultyId, doubtId, response) => {
   );
 
   if (!check.rowCount) {
-    const err = new Error("Unauthorized");
-    err.statusCode = 403;
-    throw err;
+    throw new Error("Unauthorized");
   }
 
-  await pool.query(
-    `INSERT INTO doubt_responses (doubt_id, faculty_id, response)
-     VALUES ($1,$2,$3)`,
-    [doubtId, facultyId, response]
-  );
-
-  await pool.query(
-    `UPDATE doubts SET status = 'RESOLVED'
-     WHERE doubt_id = $1`,
+  const result = await pool.query(
+    `SELECT dr.*, u.fname, u.lname
+     FROM doubt_responses dr
+     JOIN users u ON dr.sender_id = u.user_id
+     WHERE dr.doubt_id = $1
+     ORDER BY dr.created_at ASC`,
     [doubtId]
   );
 
-  return { message: "Response submitted" };
+  return result.rows;
+};
+
+
+// Send message (faculty reply)
+exports.sendDoubtMessage = async (doubtId, facultyId, senderRole, message) => {
+
+  // 🔒 Authorization check
+  const check = await pool.query(
+    `SELECT 1
+     FROM doubts d
+     JOIN courses c ON c.course_id = d.course_id
+     WHERE d.doubt_id = $1 AND c.faculty_id = $2`,
+    [doubtId, facultyId]
+  );
+
+  if (!check.rowCount) {
+    throw new Error("Unauthorized: Cannot reply to this doubt");
+  }
+
+  const result = await pool.query(
+    `INSERT INTO doubt_responses (doubt_id, sender_id, sender_role, message)
+     VALUES ($1, $2, $3, $4)
+     RETURNING *`,
+    [doubtId, facultyId, senderRole, message]
+  );
+
+  return result.rows[0];
+};
+
+
+// Update doubt status
+exports.updateDoubtStatus = async (facultyId, doubtId, status) => {
+
+  // 🔒 Authorization check
+  const check = await pool.query(
+    `SELECT 1
+     FROM doubts d
+     JOIN courses c ON c.course_id = d.course_id
+     WHERE d.doubt_id = $1 AND c.faculty_id = $2`,
+    [doubtId, facultyId]
+  );
+
+  if (!check.rowCount) {
+    throw new Error("Unauthorized");
+  }
+
+  const result = await pool.query(
+    `UPDATE doubts
+     SET status = $1
+     WHERE doubt_id = $2
+     RETURNING *`,
+    [status, doubtId]
+  );
+
+  return result.rows[0];
 };
 
 /*ASSESSMENTS*/

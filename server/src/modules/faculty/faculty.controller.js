@@ -134,61 +134,73 @@ exports.deleteMaterial = async (req, res, next) => {
 
 /*DOUBTS*/
 
-exports.getDoubts = async (req, res, next) => {
+// Get all doubts (threads for faculty courses)
+exports.getFacultyDoubts = async (req, res) => {
   try {
-    const doubts = await facultyService.getDoubts(req.user.id);
-    res.json(doubts);
+    const data = await facultyService.getFacultyDoubts(req.user.id);
+    res.status(200).json(data);
   } catch (err) {
-    next(err);
+    res.status(400).json({ error: err.message });
   }
 };
 
-exports.getCourseDoubts = async (req, res, next) => {
+
+// Get messages for a doubt
+exports.getDoubtMessages = async (req, res) => {
   try {
-    const doubts = await facultyService.getCourseDoubts(
+    const { doubtId } = req.params;
+
+    const data = await facultyService.getDoubtMessages(
       req.user.id,
-      req.params.id
+      doubtId
     );
-    res.json(doubts);
+
+    res.status(200).json(data);
   } catch (err) {
-    next(err);
+    res.status(400).json({ error: err.message });
   }
 };
 
-exports.getDoubtById = async (req, res, next) => {
+
+// Send message (faculty reply)
+exports.sendDoubtMessage = async (req, res) => {
   try {
-    const doubt = await facultyService.getDoubtById(
+    const { doubtId } = req.params;
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "message is required" });
+    }
+
+    const data = await facultyService.sendDoubtMessage(
+      doubtId,
       req.user.id,
-      req.params.id
+      "faculty",
+      message
     );
-    res.json(doubt);
+
+    res.status(201).json(data);
   } catch (err) {
-    next(err);
+    res.status(400).json({ error: err.message });
   }
 };
 
-exports.respondToDoubt = async (req, res, next) => {
-  try {
-    const result = await facultyService.respondToDoubt(
-      req.user.id,
-      req.params.id,
-      req.body.response
-    );
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-};
 
-exports.reopenDoubt = async (req, res, next) => {
+// Update doubt status
+exports.updateDoubtStatus = async (req, res) => {
   try {
-    const result = await facultyService.reopenDoubt(
+    const { doubtId } = req.params;
+    const { status } = req.body;
+
+    const data = await facultyService.updateDoubtStatus(
       req.user.id,
-      req.params.id
+      doubtId,
+      status
     );
-    res.json(result);
+
+    res.status(200).json(data);
   } catch (err) {
-    next(err);
+    res.status(400).json({ error: err.message });
   }
 };
 

@@ -35,6 +35,12 @@ export default function StudentDashboard({
   const [newDoubt, setNewDoubt] = useState({ course_id: "", doubt_text: "" });
   const [doubtSubmitMessage, setDoubtSubmitMessage] = useState("");
 
+  const [doubts, setDoubts] = useState([]);
+  const [selectedDoubt, setSelectedDoubt] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+
+
   const needsOnboarding = useMemo(() => {
     return profile && profile.user_id === null;
   }, [profile]);
@@ -102,6 +108,39 @@ export default function StudentDashboard({
       setLoading(false);
     }
   };
+
+  const fetchDoubts = async () => {
+  try {
+    const res = await api.get("/doubts");
+    setDoubts(res.data || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const loadDoubtChat = async (doubtId) => {
+  try {
+    const res = await api.get(`/doubts/${doubtId}/messages`);
+    setChatMessages(res.data || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const sendMessage = async () => {
+  if (!newMessage.trim() || !selectedDoubt) return;
+
+  try {
+    await api.post(`/doubts/${selectedDoubt.doubt_id}/message`, {
+      message: newMessage
+    });
+
+    setNewMessage("");
+    loadDoubtChat(selectedDoubt.doubt_id);
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   const sidebarItems = [
     { id: "home", label: "Dashboard" },
@@ -352,56 +391,152 @@ export default function StudentDashboard({
           api.get("/courses/enrolled").then(res => {
             setCourses(res.data);
             setCourseTab("doubts");
+            fetchDoubts();
             setDoubtSubmitMessage("");
             if (res.data.length > 0) setNewDoubt({ ...newDoubt, course_id: res.data[0].course_id });
           });
         }}>Doubts</button>
       </div>
+      
+    {courseTab === 'doubts' ? (
+      <div style={{ display: "flex", gap: "20px" }}>
 
-      {courseTab === 'doubts' ? (
-        <div className="doubt-section" style={{ padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: '8px' }}>
-          <h3 style={{ marginBottom: '1rem' }}>Ask a Doubt</h3>
-          {doubtSubmitMessage && <div style={{ color: '#16a34a', marginBottom: '1rem', fontWeight: 'bold' }}>{doubtSubmitMessage}</div>}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Select Course</label>
-            <select
-              className="form-input"
-              value={newDoubt.course_id}
-              onChange={(e) => setNewDoubt({ ...newDoubt, course_id: e.target.value })}
-            >
-              <option value="">-- Select Enrolled Course --</option>
-              {courses.map(c => (
-                <option key={c.course_id} value={c.course_id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 'bold' }}>Your Doubt</label>
-            <textarea
-              className="form-input"
-              rows="4"
-              value={newDoubt.doubt_text}
-              onChange={(e) => setNewDoubt({ ...newDoubt, doubt_text: e.target.value })}
-              placeholder="Type your question or doubt here..."
-            />
-          </div>
+        {/* LEFT: DOUBT LIST + CREATE */}
+        <div style={{ width: "30%", borderRight: "1px solid #ddd", paddingRight: "10px" }}>
+          
+          <h4>Ask Doubt</h4>
+
+          <select
+            className="form-input"
+            value={newDoubt.course_id}
+            onChange={(e) => setNewDoubt({ ...newDoubt, course_id: e.target.value })}
+          >
+            <option value="">Select Course</option>
+            {courses.map(c => (
+              <option key={c.course_id} value={c.course_id}>{c.name}</option>
+            ))}
+          </select>
+
+          <textarea
+            className="form-input"
+            rows="3"
+            value={newDoubt.doubt_text}
+            onChange={(e) => setNewDoubt({ ...newDoubt, doubt_text: e.target.value })}
+            placeholder="Enter doubt..."
+            style={{ marginTop: "10px" }}
+          />
+
           <button
             className="btn btn-primary"
+            style={{ marginTop: "10px", width: "100%" }}
             onClick={async () => {
               if (!newDoubt.course_id || !newDoubt.doubt_text.trim()) {
-                alert("Please select a course and enter your doubt.");
+                alert("Enter details");
                 return;
               }
+
               try {
-                await api.post("/doubts", newDoubt);
-                setDoubtSubmitMessage("Doubt submitted successfully!");
+                const res = await api.post("/doubts", newDoubt);
+
                 setNewDoubt({ ...newDoubt, doubt_text: "" });
-              } catch (err) {
-                alert("Failed to submit doubt");
+
+                fetchDoubts();
+
+                setSelectedDoubt(res.data);
+                loadDoubtChat(res.data.doubt_id);
+
+              } catch {
+                alert("Failed");
               }
             }}
-          >Submit Doubt</button>
+          >
+            Create
+          </button>
+
+          <hr style={{ margin: "20px 0" }} />
+
+          <h4>Your Doubts</h4>
+
+          {doubts.length === 0 ? (
+            <p>No doubts</p>
+          ) : (
+            doubts.map(d => (
+              <div
+                key={d.doubt_id}
+                style={{
+                  padding: "10px",
+                  borderBottom: "1px solid #eee",
+                  cursor: "pointer"
+                }}
+                onClick={() => {
+                  setSelectedDoubt(d);
+                  loadDoubtChat(d.doubt_id);
+                }}
+              >
+                Doubt #{d.doubt_id}
+              </div>
+            ))
+          )}
         </div>
+
+        {/* RIGHT: CHAT */}
+        <div style={{ width: "70%" }}>
+
+          {selectedDoubt ? (
+            <>
+              <h4>Chat</h4>
+
+              <div
+                style={{
+                  height: "350px",
+                  overflowY: "auto",
+                  border: "1px solid #ddd",
+                  padding: "10px",
+                  marginBottom: "10px"
+                }}
+              >
+                {chatMessages.map(msg => (
+                  <div
+                    key={msg.response_id}
+                    style={{
+                      textAlign: msg.sender_id === user.id ? "right" : "left",
+                      marginBottom: "10px"
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "inline-block",
+                        padding: "8px",
+                        borderRadius: "6px",
+                        background: msg.sender_id === user.id ? "#3b82f6" : "#e5e7eb",
+                        color: msg.sender_id === user.id ? "#fff" : "#000"
+                      }}
+                    >
+                      {msg.message}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", gap: "10px" }}>
+                <input
+                  className="form-input"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type message..."
+                />
+                <button className="btn btn-primary" onClick={sendMessage}>
+                  Send
+                </button>
+              </div>
+            </>
+          ) : (
+            <p>Select a doubt to start chat</p>
+          )}
+
+        </div>
+
+      </div>
       ) : (
         <div className="table-responsive">
           <table className="data-table">

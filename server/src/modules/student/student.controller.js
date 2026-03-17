@@ -339,6 +339,64 @@ async function getOfferHistory(req, res) {
     res.status(400).json({ error: err.message });
   }
 }
+async function getStudentDoubts(req, res) {
+  try {
+    const data = await studentService.getStudentDoubts(req.user.id);
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+async function getDoubtMessages(req, res) {
+  try {
+    const { doubtId } = req.params;
+
+    const data = await studentService.getDoubtMessages(doubtId);
+
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function sendDoubtMessage(req, res) {
+  try {
+    const { doubtId } = req.params;
+    const { message } = req.body;
+
+    if (!message) {
+      return res.status(400).json({ error: "message is required" });
+    }
+
+    const data = await studentService.sendDoubtMessage(
+      doubtId,
+      req.user.id,
+      "student",
+      message
+    );
+
+    res.status(201).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+async function updateDoubtStatus(req, res) {
+  try {
+    const { doubtId } = req.params;
+    const { status } = req.body;
+
+    const data = await studentService.updateDoubtStatus(doubtId, status);
+
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+}
+
+
+
+
 
 module.exports = {
   getStudentProfile,
@@ -368,5 +426,9 @@ module.exports = {
   getOfferStatus,
   withdrawApplication,
   getOfferHistory,
-  submitDoubt
+  submitDoubt,
+  getStudentDoubts,
+  getDoubtMessages,
+  sendDoubtMessage,
+  updateDoubtStatus
 };

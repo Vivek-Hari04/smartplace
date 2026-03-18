@@ -10,6 +10,8 @@ const router = require("./src/routes/router");
 const errorMiddleware = require("./src/middleware/error.middleware");
 const pool = require("./src/config/db"); // Shared DB pool instance
 
+const cron = require("node-cron");
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -112,6 +114,22 @@ app.use("/api", authenticateUser, router);
 app.use(errorMiddleware);
 
 /*SERVER START*/
+
+cron.schedule("0 0 * * *", async () => {
+  try {
+    const result = await pool.query(`
+      DELETE FROM doubts
+      WHERE status = 'RESOLVED'
+      AND resolved_at < NOW() - INTERVAL '10 days'
+    `);
+    
+    if (result.rowCount > 0) {
+      console.log(`[CRON] Auto-deleted ${result.rowCount} old resolved doubts.`);
+    }
+  } catch (err) {
+    console.error("[CRON] Error deleting old doubts:", err);
+  }
+});
 
 const startServer = async () => {
   try {

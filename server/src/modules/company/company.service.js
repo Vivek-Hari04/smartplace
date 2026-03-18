@@ -94,99 +94,136 @@ async function getMyDrives(userId) {
 }
 
 async function deleteDrive(companyId, driveId) {
-  // Validate ownership
-  const driveCheck = await pool.query(
-    `SELECT 1 FROM placement_drives WHERE drive_id = $1 AND company_id = $2`,
-    [driveId, companyId]
-  );
+  const client = await pool.connect();
 
-  if (driveCheck.rows.length === 0) {
-    throw new Error("Invalid drive ID or unauthorized");
+  try {
+    await client.query("BEGIN");
+
+    // 🔒 Validate ownership
+    const driveCheck = await client.query(
+      `SELECT 1 
+       FROM placement_drives 
+       WHERE drive_id = $1 AND company_id = $2`,
+      [driveId, companyId]
+    );
+
+    if (driveCheck.rows.length === 0) {
+      throw new Error("Invalid drive ID or unauthorized");
+    }
+
+  
+    await client.query(
+      `DELETE FROM drive_registrations 
+       WHERE drive_id = $1`,
+      [driveId]
+    );
+
+    //  Delete drive → offers.drive_id becomes NULL automatically
+    const result = await client.query(
+      `DELETE FROM placement_drives 
+       WHERE drive_id = $1 AND company_id = $2
+       RETURNING *`,
+      [driveId, companyId]
+    );
+
+    await client.query("COMMIT");
+
+    return result.rows[0];
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
-
-  // Delete all offer applications for offers tied to this drive
-  await pool.query(
-    `DELETE FROM offer_applications WHERE offer_id IN (SELECT offer_id FROM placement_offers WHERE drive_id = $1)`,
-    [driveId]
-  );
-
-  // Delete all placement offers tied to this drive
-  await pool.query(
-    `DELETE FROM placement_offers WHERE drive_id = $1`,
-    [driveId]
-  );
-
-  // Delete all registrations for this drive
-  await pool.query(
-    `DELETE FROM drive_registrations WHERE drive_id = $1`,
-    [driveId]
-  );
-
-  // Delete the drive itself
-  const result = await pool.query(
-    `DELETE FROM placement_drives WHERE drive_id = $1 AND company_id = $2 RETURNING *`,
-    [driveId, companyId]
-  );
-
-  return result.rows[0];
 }
 
-/* =========================
-   PLACEMENT OFFERS
-========================= */
+/*PLACEMENT OFFERS*/
 
 async function createOffer(userId, offerData) {
   const { drive_id, title, description, package_lpa, location, acceptance_deadline } = offerData;
 
-  // Verify drive belongs to company and is approved
-  const driveCheck = await pool.query(
-    `SELECT 1 
-     FROM placement_drives 
-     WHERE drive_id = $1 
-     AND company_id = $2 
-     AND status = 'APPROVED'`,
-    [drive_id, userId]
-  );
+  const client = await pool.connect();
 
-  if (driveCheck.rows.length === 0) {
-    throw new Error("Invalid drive ID or drive not yet approved by admin.");
+  try {
+    await client.query("BEGIN");
+
+    //  Validate drive ownership + approval
+    const driveCheck = await client.query(
+      `SELECT 1 
+       FROM placement_drives 
+       WHERE drive_id = $1 
+       AND company_id = $2 
+       AND status = 'APPROVED'`,
+      [drive_id, userId]
+    );
+
+    if (driveCheck.rows.length === 0) {
+      throw new Error("Invalid drive ID or drive not yet approved by admin.");
+    }
+
+    // Create offer
+    const offerRes = await client.query(
+      `INSERT INTO placement_offers 
+       (drive_id, company_id, title, description, package_lpa, location, acceptance_deadline)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [drive_id, userId, title, description, package_lpa, location, acceptance_deadline]
+    );
+
+    if (offerRes.rows.length === 0) {
+      throw new Error("Failed to create offer");
+    }
+
+    const offer = offerRes.rows[0];
+
+    //  STEP 1: Persist selected students as OFFERED
+    await client.query(
+      `INSERT INTO offer_applications (offer_id, student_id, status)
+       SELECT $1, dr.student_id, 'offered'
+       FROM drive_registrations dr
+       WHERE dr.drive_id = $2
+       AND dr.status = 'selected'`,
+      [offer.offer_id, drive_id]
+    );
+
+    //  STEP 2: Increment offers_received
+    await client.query(
+      `UPDATE students
+       SET offers_received = offers_received + 1
+       WHERE user_id IN (
+         SELECT student_id
+         FROM drive_registrations
+         WHERE drive_id = $1
+         AND status = 'selected'
+       )`,
+      [drive_id]
+    );
+
+    await client.query("COMMIT");
+
+    return offer;
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
   }
-
-  // Create offer
-  const result = await pool.query(
-    `INSERT INTO placement_offers 
-     (drive_id, company_id, title, description, package_lpa, location, acceptance_deadline)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
-    [drive_id, userId, title, description, package_lpa, location, acceptance_deadline]
-  );
-  if (result.rows.length === 0) {
-    throw new Error("Failed to create offer for the drive. offer already created");
-  }
-  const offer = result.rows[0];
-
-  // Increment offers_received for students selected in this drive
-  await pool.query(
-    `UPDATE students
-     SET offers_received = offers_received + 1
-     WHERE user_id IN (
-       SELECT student_id
-       FROM drive_registrations
-       WHERE drive_id = $1
-       AND status = 'selected'
-     )`,
-    [drive_id]
-  );
-
-  return offer;
 }
 
 async function getMyOffers(userId) {
   const result = await pool.query(
-    `SELECT po.*, pd.drive_date 
-     FROM placement_offers po
-     JOIN placement_drives pd ON po.drive_id = pd.drive_id
-     WHERE po.company_id = $1`,
+    `SELECT po.offer_id,
+    po.title,po.description,po.package_lpa,
+    po.location,po.acceptance_deadline,
+    po.created_at,po.drive_id,
+    COALESCE(pd.drive_date::text, 'N/A') AS drive_date
+    FROM placement_offers po
+    LEFT JOIN placement_drives pd 
+    ON po.drive_id = pd.drive_id
+    WHERE po.company_id = $1
+    ORDER BY po.created_at DESC;`,
     [userId]
   );
   return result.rows;
@@ -228,9 +265,7 @@ async function deleteOffer(companyId, offerId) {
   return result.rows[0];
 }
 
-/* =========================
-   APPLICANTS
-========================= */
+/* APPLICANTS*/
 
 async function getDriveApplicants(userId, driveId) {
   const result = await pool.query(
@@ -263,34 +298,33 @@ async function updateApplicantStatus(userId, registrationId, status) {
   }
   return result.rows[0];
 }
-
 async function getOfferApplicants(companyId, offerId) {
-  const offerRes = await pool.query(
-    `SELECT * FROM placement_offers WHERE offer_id = $1 AND company_id = $2`,
-    [offerId, companyId]
-  );
-  if (offerRes.rows.length === 0) {
-    throw new Error("Offer not found or unauthorized");
-  }
+        const offerRes = await pool.query(
+          `SELECT * FROM placement_offers WHERE offer_id = $1 AND company_id = $2`,
+          [offerId, companyId]
+        );
 
-  const driveId = offerRes.rows[0].drive_id;
+        if (offerRes.rows.length === 0) {
+          throw new Error("Offer not found or unauthorized");
+        }
 
-  const result = await pool.query(
-    `SELECT
-       oa.application_id,
-       s.user_id AS student_id,
-       u.fname,
-       u.lname,
-       s.department,
-       s.cgpa,
-       COALESCE(oa.status, 'offered') AS status
-     FROM drive_registrations dr
-     JOIN students s ON s.user_id = dr.student_id
-     JOIN users u ON u.user_id = s.user_id
-     LEFT JOIN offer_applications oa ON oa.student_id = dr.student_id AND oa.offer_id = $1
-     WHERE dr.drive_id = $2 AND dr.status = 'selected'`,
-    [offerId, driveId]
-  );
+      const result = await pool.query(
+      `SELECT
+        oa.application_id,
+        s.user_id AS student_id,
+        u.fname,
+        u.lname,
+        s.department,
+        s.cgpa,
+        oa.status
+      FROM offer_applications oa
+      JOIN students s ON s.user_id = oa.student_id
+      JOIN users u ON u.user_id = s.user_id
+      WHERE oa.offer_id = $1
+      AND oa.status IN ('offered', 'accepted')`,
+      [offerId]
+);
+
   return result.rows;
 }
 

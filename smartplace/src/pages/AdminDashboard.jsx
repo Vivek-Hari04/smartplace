@@ -78,6 +78,14 @@ export default function AdminDashboard({ user, accessToken }) {
   const [departments, setDepartments] = useState([]);
   const [attendeeStatusFilter, setAttendeeStatusFilter] = useState('All');
 
+  // Placed Students State
+  const [placedStudents, setPlacedStudents] = useState([]);
+  const [placedDeptFilter, setPlacedDeptFilter] = useState('');
+  const [placedCompanyFilter, setPlacedCompanyFilter] = useState('');
+  const [placedMinLpa, setPlacedMinLpa] = useState('');
+  const [placedMaxLpa, setPlacedMaxLpa] = useState('');
+  const [placedIncludeUnplaced, setPlacedIncludeUnplaced] = useState(false);
+
   const api = useMemo(() => {
     return axios.create({
       baseURL: import.meta.env.VITE_API_URL,
@@ -136,7 +144,7 @@ export default function AdminDashboard({ user, accessToken }) {
 
     fetchData(activeTab);
 
-    if (activeTab === "filter-students") {
+    if (activeTab === "filter-students" || activeTab === "placed-students") {
       fetchDepartments();
     }
 
@@ -238,6 +246,75 @@ export default function AdminDashboard({ user, accessToken }) {
     }
   };
 
+  const fetchPlacedStudents = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get("/admin/placed-students", {
+        params: {
+          department: placedDeptFilter || undefined,
+          company_name: placedCompanyFilter || undefined,
+          min_lpa: placedMinLpa || undefined,
+          max_lpa: placedMaxLpa || undefined,
+          include_unplaced: placedIncludeUnplaced
+        }
+      });
+      setPlacedStudents(res.data);
+    } catch (err) {
+      alert("Failed to fetch placed students");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const downloadPlacedPDF = async () => {
+    try {
+      // Build query string
+      const params = new URLSearchParams({
+        department: placedDeptFilter || '',
+        company_name: placedCompanyFilter || '',
+        min_lpa: placedMinLpa || '',
+        max_lpa: placedMaxLpa || '',
+        include_unplaced: placedIncludeUnplaced
+      }).toString();
+      
+      const res = await api.get(`/admin/placed-students/export/pdf?${params}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'placed_students.pdf');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      alert("Error downloading PDF");
+    }
+  };
+
+  const downloadPlacedCSV = async () => {
+    try {
+      // Build query string
+      const params = new URLSearchParams({
+        department: placedDeptFilter || '',
+        company_name: placedCompanyFilter || '',
+        min_lpa: placedMinLpa || '',
+        max_lpa: placedMaxLpa || '',
+        include_unplaced: placedIncludeUnplaced
+      }).toString();
+      
+      const res = await api.get(`/admin/placed-students/export/csv?${params}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'placed_students.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      alert("Error downloading CSV");
+    }
+  };
+
+
   const handleDownloadFilteredPDF = () => {
     if (filteredStudents.length === 0) return;
     const doc = new jsPDF();
@@ -315,6 +392,7 @@ export default function AdminDashboard({ user, accessToken }) {
     { id: 'pending-users', label: 'Approve Registrations' },
     { id: 'students', label: 'Pending Students' },
     { id: 'filter-students', label: 'Student Filter' },
+    { id: 'placed-students', label: 'Placed Students' },
     { id: 'all-drives', label: 'All Drives' },
     { id: 'faculty', label: 'Faculty List' },
     { id: 'courses', label: 'All Courses' },
@@ -1051,6 +1129,116 @@ export default function AdminDashboard({ user, accessToken }) {
                     ))}
                   </tbody>
                 </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'placed-students' && (
+            <div style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+                <div>
+                  <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Department</h4>
+                  <select
+                    className="form-input"
+                    value={placedDeptFilter}
+                    onChange={(e) => setPlacedDeptFilter(e.target.value)}
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', minWidth: '150px' }}
+                  >
+                    <option value="">All Departments</option>
+                    {departments.map(dep => (
+                      <option key={dep.department} value={dep.department}>{dep.department}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Company Name</h4>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. TCS"
+                    value={placedCompanyFilter}
+                    onChange={(e) => setPlacedCompanyFilter(e.target.value)}
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '150px' }}
+                  />
+                </div>
+                <div>
+                  <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Min LPA</h4>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="e.g. 5"
+                    value={placedMinLpa}
+                    onChange={(e) => setPlacedMinLpa(e.target.value)}
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100px' }}
+                  />
+                </div>
+                <div>
+                  <h4 style={{ marginBottom: '0.75rem', marginTop: 0 }}>Max LPA</h4>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="e.g. 12"
+                    value={placedMaxLpa}
+                    onChange={(e) => setPlacedMaxLpa(e.target.value)}
+                    style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border-color)', width: '100px' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', flexWrap: 'wrap' }}>
+                <button className="btn btn-primary" onClick={fetchPlacedStudents}>
+                  Apply Filter
+                </button>
+                <button className="btn btn-secondary" onClick={downloadPlacedPDF} disabled={placedStudents.length === 0}>
+                  Download PDF
+                </button>
+                <button className="btn btn-secondary" onClick={downloadPlacedCSV} disabled={placedStudents.length === 0}>
+                  Download CSV
+                </button>
+              </div>
+
+              {placedStudents.length > 0 && (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Department</th>
+                      <th>Company</th>
+                      <th>LPA</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {placedStudents.map((s, index) => (
+                      <tr key={index}>
+                        <td>
+                          <strong>{`${s.fname} ${s.lname || ''}`.trim()}</strong>
+                        </td>
+                        <td><span className="user-id-text">{s.email}</span></td>
+                        <td>
+                          <span className="badge-pill" style={{background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6'}}>
+                            {s.department}
+                          </span>
+                        </td>
+                        <td><strong>{s.company_name || "-"}</strong></td>
+                        <td><span style={{fontWeight: 600}}>{s.package_lpa ? Number(s.package_lpa).toFixed(2) : "-"}</span></td>
+                        <td>
+                          <span className={`badge-pill`} style={{
+                            background: s.offer_status === 'accepted' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                            color: s.offer_status === 'accepted' ? '#10b981' : '#ef4444'
+                          }}>
+                            {s.offer_status === 'accepted' ? 'Placed' : 'Not Placed'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              {placedStudents.length === 0 && !loading && (
+                <div style={{textAlign:'center', padding: '3rem', color: 'var(--text-secondary)'}}>
+                  No students found matching these filters. Click "Apply Filter" to load data.
+                </div>
               )}
             </div>
           )}

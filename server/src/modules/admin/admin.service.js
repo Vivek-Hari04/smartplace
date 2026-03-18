@@ -209,3 +209,83 @@ exports.getFacultyList = async () => {
   );
   return result.rows;
 };
+
+/* PLACED STUDENTS FEATURE */
+
+exports.getPlacedStudents = async (filters, includeUnplaced = false) => {
+  const { department, company_name, min_lpa, max_lpa } = filters;
+  
+  let queryArgs = [];
+  let paramIndex = 1;
+
+  let query = `
+    SELECT 
+      s.user_id as student_id, 
+      u.fname, 
+      u.lname, 
+      u.email, 
+      s.department, 
+      c.company_name, 
+      po.package_lpa, 
+      oa.status as offer_status,
+      oa.accepted_at
+    FROM students s
+    JOIN users u ON s.user_id = u.user_id
+  `;
+
+  if (includeUnplaced) {
+    query += `
+      LEFT JOIN offer_applications oa ON s.user_id = oa.student_id AND oa.status = 'accepted'
+      LEFT JOIN placement_offers po ON oa.offer_id = po.offer_id
+      LEFT JOIN companies c ON po.company_id = c.user_id
+      WHERE u.role = 'student'
+    `;
+  } else {
+    query += `
+      JOIN offer_applications oa ON s.user_id = oa.student_id AND oa.status = 'accepted'
+      JOIN placement_offers po ON oa.offer_id = po.offer_id
+      JOIN companies c ON po.company_id = c.user_id
+      WHERE u.role = 'student'
+    `;
+  }
+
+  if (department && department.trim() !== "") {
+    query += ` AND s.department = $${paramIndex++}`;
+    queryArgs.push(department);
+  }
+
+  if (company_name && company_name.trim() !== "") {
+    if (includeUnplaced) {
+      query += ` AND (c.company_name ILIKE $${paramIndex} OR c.company_name IS NULL)`;
+    } else {
+      query += ` AND c.company_name ILIKE $${paramIndex}`;
+    }
+    queryArgs.push(`%${company_name}%`);
+    paramIndex++;
+  }
+
+  if (min_lpa && min_lpa.trim() !== "") {
+    if (includeUnplaced) {
+      query += ` AND (po.package_lpa >= $${paramIndex} OR po.package_lpa IS NULL)`;
+    } else {
+      query += ` AND po.package_lpa >= $${paramIndex}`;
+    }
+    queryArgs.push(Number(min_lpa));
+    paramIndex++;
+  }
+
+  if (max_lpa && max_lpa.trim() !== "") {
+    if (includeUnplaced) {
+      query += ` AND (po.package_lpa <= $${paramIndex} OR po.package_lpa IS NULL)`;
+    } else {
+      query += ` AND po.package_lpa <= $${paramIndex}`;
+    }
+    queryArgs.push(Number(max_lpa));
+    paramIndex++;
+  }
+
+  query += ` ORDER BY u.fname ASC, u.lname ASC`;
+
+  const result = await pool.query(query, queryArgs);
+  return result.rows;
+};

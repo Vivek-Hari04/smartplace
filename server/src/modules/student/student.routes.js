@@ -190,8 +190,8 @@ router.get(
   studentController.getOfferStatus
 );
 
-router.put(
-  "/offers/withdraw/:applicationId",
+router.delete(
+  "/offers/:applicationId/withdraw",
   authMiddleware,
   studentController.withdrawApplication
 );
@@ -234,4 +234,12 @@ router.put(
   authMiddleware,
   studentController.updateDoubtStatus
 );
+
+// Delete a resolved doubt
+router.delete(
+  "/doubts/:doubtId",
+  authMiddleware,
+  studentController.deleteDoubt
+);
+
 module.exports = router;

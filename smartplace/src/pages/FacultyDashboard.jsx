@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import axios from "axios";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import "../styles/Dashboard.css";
@@ -29,12 +29,17 @@ export default function FacultyDashboard({
   const [assessmentFormData, setAssessmentFormData] = useState({ title: "", description: "", deadline: "" });
   const [responseFormData, setResponseFormData] = useState({ doubt_id: 0, response: "" });
   const [showResponseForm, setShowResponseForm] = useState(false);
-  const [gradeFormData, setGradeFormData] = useState({ submission_id: 0, grade: "", feedback: "" });
+  const [gradeFormData, setGradeFormData] = useState({ submission_id: 0, score: "", feedback: "" });
   const [showGradeForm, setShowGradeForm] = useState(false);
 
   const [selectedDoubt, setSelectedDoubt] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "auto" });
+  }, [messages]);
 
   /* ================= AXIOS INSTANCE ================= */
   const api = useMemo(() => {
@@ -229,11 +234,22 @@ useEffect(() => {
   const handleEvaluate = async (e) => {
     e.preventDefault();
     try {
+      const numericScore = parseInt(gradeFormData.score, 10);
       await api.patch(`/faculty/submissions/${gradeFormData.submission_id}/evaluate`, {
-        grade: gradeFormData.grade,
+        score: numericScore,
         feedback: gradeFormData.feedback
       });
-      setSubmissions(submissions.map(s => s.submission_id === gradeFormData.submission_id ? { ...s, grade: gradeFormData.grade, feedback: gradeFormData.feedback } : s));
+      setSubmissions(prev =>
+          prev.map(s =>
+            s.submission_id === gradeFormData.submission_id
+              ? {
+                  ...s,
+                  score: numericScore,
+                  feedback: gradeFormData.feedback
+                }
+              : s
+          )
+      );
       setShowGradeForm(false);
     } catch (err) {
       alert("Failed to evaluate submission");
@@ -515,10 +531,10 @@ const sendMessage = async () => {
             <form onSubmit={handleEvaluate} className="content-card" style={{ marginBottom: "1rem" }}>
               <h3>Grade Submission</h3>
               <div style={{ display: "flex", gap: "1rem", flexDirection: "column" }}>
-                <input className="form-input" placeholder="Grade (e.g., A, 90, Good)" required value={gradeFormData.grade} onChange={e => setGradeFormData({...gradeFormData, grade: e.target.value})} />
+                <input type="number" className="form-input" placeholder="Marks (e.g. 90, 80)" required value={gradeFormData.score} onChange={e => setGradeFormData({...gradeFormData, score: e.target.value})} />
                 <textarea className="form-input" placeholder="Feedback" value={gradeFormData.feedback} onChange={e => setGradeFormData({...gradeFormData, feedback: e.target.value})} />
                 <div className="action-buttons">
-                  <button type="submit" className="btn btn-primary">Submit Grade</button>
+                  <button type="submit" className="btn btn-primary">Submit Mark</button>
                   <button type="button" className="btn btn-secondary" onClick={() => setShowGradeForm(false)}>Cancel</button>
                 </div>
               </div>
@@ -532,10 +548,17 @@ const sendMessage = async () => {
                 {submissions.length === 0 ? <tr><td colSpan={4}>No submissions yet.</td></tr> :
                   submissions.map(s => (
                     <tr key={s.submission_id}>
-                      <td>{s.fname} {s.lname}</td>
+                      <td>
+                          {s.fname} {s.lname}
+                          {s.is_late && (
+                            <span style={{ marginLeft: "8px", color: "red", fontSize: "12px" }}>
+                              (Late)
+                            </span>
+                          )}
+                      </td>
                       <td><a href={s.submission_url} target="_blank" rel="noreferrer">View Work</a></td>
-                      <td>{s.grade || "Not Graded"}</td>
-                      <td><button className="btn btn-secondary" onClick={() => { setGradeFormData({ submission_id: s.submission_id, grade: s.grade || "", feedback: s.feedback || "" }); setShowGradeForm(true); }}>Grade</button></td>
+                      <td>{s.score !== null && s.score !== undefined ? s.score : "Not Graded"}</td>
+                      <td><button className="btn btn-secondary" onClick={() => { setGradeFormData({ submission_id: s.submission_id, score: s.score || "", feedback: s.feedback || "" }); setShowGradeForm(true); }}>Grade</button></td>
                     </tr>
                   ))}
               </tbody>
@@ -759,6 +782,7 @@ const sendMessage = async () => {
                 </div>
               </div>
             ))}
+            <div ref={chatEndRef}></div>
           </div>
 
           {/* INPUT */}

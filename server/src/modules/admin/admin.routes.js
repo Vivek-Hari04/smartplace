@@ -21,6 +21,11 @@ router.get("/students/pending", adminController.getPendingStudents);
 router.patch("/students/:id/verify", adminController.verifyStudent);
 router.post("/students/assign-advisor", adminController.assignAdvisor);
 
+/* PLACED STUDENTS */
+router.get("/placed-students", adminController.getPlacedStudents);
+router.get("/placed-students/export/pdf", adminController.exportPlacedStudentsPDF);
+router.get("/placed-students/export/csv", adminController.exportPlacedStudentsCSV);
+
 /* SYSTEM OVERSIGHT */
 router.get("/stats", adminController.getStats);
 router.get("/courses", adminController.getAllCourses);

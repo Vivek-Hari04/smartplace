@@ -611,7 +611,7 @@ export default function CompanyDashboard({ user, accessToken }) {
             <form onSubmit={handleOfferPost} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <div className="form-group">
                 <label>Associated Drive</label>
-                <select className="form-input" required value={offerForm.drive_id} onChange={e => setOfferForm({...offerForm, drive_id: e.target.value})}>
+                <select className="form-input" required value={offerForm.drive_id} onChange={e => setOfferForm({...offerForm, drive_id: Number(e.target.value)})}>
                   <option value="">-- Select Approved Drive --</option>
                   {drives.filter(d => d.status === 'APPROVED').map(d => (
                     <option key={d.drive_id} value={d.drive_id}>

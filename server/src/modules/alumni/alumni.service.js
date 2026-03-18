@@ -4,6 +4,17 @@ const pool = require("../../config/db");
    ALUMNI PROFILE
    ========================= */
 
+async function getAlumniDirectory() {
+  const result = await pool.query(
+    `SELECT u.user_id, u.email, u.fname, u.lname, a.company, a.graduation_year 
+     FROM users u
+     LEFT JOIN alumni a ON u.user_id = a.user_id
+     WHERE u.role = 'alumni'
+     ORDER BY a.graduation_year DESC NULLS LAST, u.fname ASC`
+  );
+  return result.rows;
+}
+
 async function getAlumniProfile(userId) {
   const result = await pool.query(
     `SELECT u.user_id, u.email, u.fname, u.lname, a.company, a.graduation_year 
@@ -107,10 +118,12 @@ async function deleteDiscussion(discussionId, userId) {
 async function getRepliesByDiscussionId(discussionId) {
   const result = await pool.query(
     `SELECT r.*, u.fname, u.lname, u.role, 
-            a.company as current_company, a.graduation_year as batch
+            a.company as current_company, a.graduation_year as batch,
+            s.department as student_branch
      FROM discussion_replies r
      JOIN users u ON r.user_id = u.user_id
      LEFT JOIN alumni a ON r.user_id = a.user_id
+     LEFT JOIN students s ON r.user_id = s.user_id
      WHERE r.discussion_id = $1
      ORDER BY r.created_at ASC`,
     [discussionId]
@@ -136,5 +149,6 @@ module.exports = {
   getRepliesByDiscussionId,
   createReply,
   getAlumniProfile,
-  updateAlumniProfile
+  updateAlumniProfile,
+  getAlumniDirectory
 };

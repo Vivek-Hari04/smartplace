@@ -90,6 +90,16 @@ async function updateProfile(req, res) {
   }
 }
 
+async function getAlumniDirectory(req, res) {
+  try {
+    const directory = await alumniService.getAlumniDirectory();
+    res.json(directory);
+  } catch (err) {
+    console.error("Error fetching alumni directory:", err);
+    res.status(500).json({ error: "Failed to fetch alumni directory" });
+  }
+}
+
 module.exports = {
   getAllDiscussions,
   createDiscussion,
@@ -97,5 +107,6 @@ module.exports = {
   deleteDiscussion,
   createReply,
   getProfile,
-  updateProfile
+  updateProfile,
+  getAlumniDirectory
 };

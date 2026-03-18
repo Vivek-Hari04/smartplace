@@ -4,6 +4,7 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import PlacementGuidance from '../components/PlacementGuidance';
 import Onboarding from './Onboarding';
 import AlumniProfile from '../components/AlumniProfile';
+import AlumniNetwork from '../components/AlumniNetwork';
 import '../styles/Dashboard.css';
 
 export default function AlumniDashboard({ user, accessToken }) {
@@ -35,7 +36,7 @@ export default function AlumniDashboard({ user, accessToken }) {
   }, [api]);
 
   const needsOnboarding = useMemo(() => {
-    return profile && profile.user_id === null;
+    return profile && profile.company === null;
   }, [profile]);
 
   const sidebarItems = [
@@ -70,7 +71,7 @@ export default function AlumniDashboard({ user, accessToken }) {
 
       <section className="content-card">
         {activeTab === 'guidance' ? (
-          <PlacementGuidance accessToken={accessToken} userRole="alumni" />
+          <PlacementGuidance accessToken={accessToken} userRole="alumni" currentUser={user} />
         ) : activeTab === 'profile' ? (
           <AlumniProfile 
             user={user} 
@@ -79,10 +80,7 @@ export default function AlumniDashboard({ user, accessToken }) {
             onUpdate={fetchProfile} 
           />
         ) : (
-          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
-            <h3>Welcome to the Alumni Network</h3>
-            <p>This module section is currently being set up. Check back soon for updates!</p>
-          </div>
+          <AlumniNetwork accessToken={accessToken} />
         )}
       </section>
     </DashboardLayout>

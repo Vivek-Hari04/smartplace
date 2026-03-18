@@ -3,6 +3,7 @@ import axios from "axios";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import Onboarding from "./Onboarding";
 import PlacementGuidance from "../components/PlacementGuidance";
+import AlumniNetwork from "../components/AlumniNetwork";
 import "../styles/Dashboard.css";
 export default function StudentDashboard({
   user,
@@ -152,7 +153,8 @@ const sendMessage = async () => {
     { id: "drive-eligibility", label: "Drive Eligibility" },
     { id: "drive-results", label: "Drive Results" },
     { id: "my-offers", label: "My Offers" },
-    { id: "alumni", label: "Alumni Connect" },
+    { id: "alumni", label: "Doubt Clearance" },
+    { id: "network", label: "Alumni Network" },
     { id: "documents", label: "Documents" }
   ];
 
@@ -1238,7 +1240,8 @@ const sendMessage = async () => {
         {activeTab === "drive-eligibility" && renderDriveEligibility()}
         {activeTab === "drive-results" && renderDriveStatus()}
         {activeTab === "my-offers" && renderMyOffers()}
-        {activeTab === "alumni" && <PlacementGuidance accessToken={accessToken} userRole="student" />}
+        {activeTab === "alumni" && <PlacementGuidance accessToken={accessToken} userRole="student" currentUser={user} />}
+        {activeTab === "network" && <AlumniNetwork accessToken={accessToken} />}
         {activeTab === "documents" && renderDocuments()}
       </div>
       {isMaterialsModalOpen && (

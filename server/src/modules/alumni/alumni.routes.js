@@ -14,5 +14,6 @@ router.post("/discussions/:id/replies", alumniController.createReply);
 // Profile Routes
 router.get("/profile", alumniController.getProfile);
 router.put("/profile", alumniController.updateProfile);
+router.get("/directory", alumniController.getAlumniDirectory);
 
 module.exports = router;

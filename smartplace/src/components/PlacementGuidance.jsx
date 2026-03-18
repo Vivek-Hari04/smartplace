@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
-export default function PlacementGuidance({ accessToken, userRole }) {
+export default function PlacementGuidance({ accessToken, userRole, currentUser }) {
   const [discussions, setDiscussions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -175,28 +175,34 @@ export default function PlacementGuidance({ accessToken, userRole }) {
                     <p style={{ margin: 0 }}>No guidance provided yet. Waiting for alumni to reply.</p>
                   </div>
                 ) : (
-                  selectedDiscussion.replies?.map(r => (
+                  selectedDiscussion.replies?.map(r => {
+                    const isMyReply = r.user_id === currentUser.id;
+                    return (
                     <div key={r.id} style={{ 
-                      alignSelf: r.role === userRole ? 'flex-end' : 'flex-start',
+                      alignSelf: isMyReply ? 'flex-end' : 'flex-start',
                       maxWidth: '85%',
                       padding: '1rem', 
-                      background: r.role === 'alumni' ? 'rgba(56, 189, 248, 0.1)' : 'var(--bg-tertiary)', 
+                      background: isMyReply ? 'rgba(56, 189, 248, 0.1)' : 'var(--bg-tertiary)', 
                       borderRadius: '12px',
-                      border: r.role === 'alumni' ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid var(--border-color)',
-                      borderBottomRightRadius: r.role === userRole ? '2px' : '12px',
-                      borderBottomLeftRadius: r.role !== userRole ? '2px' : '12px',
+                      border: isMyReply ? '1px solid rgba(56, 189, 248, 0.3)' : '1px solid var(--border-color)',
+                      borderBottomRightRadius: isMyReply ? '2px' : '12px',
+                      borderBottomLeftRadius: !isMyReply ? '2px' : '12px',
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', gap: '1rem' }}>
                         <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{r.fname} {r.lname}</span>
-                        {r.role === 'alumni' && (
+                        {r.role === 'alumni' ? (
                           <span className="status-badge" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', background: '#e0f2fe', color: '#0369a1' }}>
-                            Alumni • {r.current_company}
+                            Alumni • {r.current_company || 'Unspecified'}
                           </span>
-                        )}
+                        ) : r.role === 'student' ? (
+                          <span className="status-badge" style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem', background: '#ecfdf5', color: '#047857' }}>
+                            Student • {r.student_branch || 'Unassigned'}
+                          </span>
+                        ) : null}
                       </div>
                       <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-primary)', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>{r.content}</p>
                     </div>
-                  ))
+                  )})
                 )}
                 <div ref={chatEndRef} />
               </div>

@@ -46,3 +46,34 @@ exports.rejectDocument = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getPendingDocuments = async (req, res, next) => {
+  try {
+    const docs = await advisorService.getPendingDocuments();
+    res.json(docs);
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.viewDocument = async (req, res, next) => {
+  try {
+    const url = await advisorService.viewDocument(req.params.id);
+    res.json({ url });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateDocumentStatus = async (req, res, next) => {
+  try {
+    const { status } = req.body;
+    if (!['VERIFIED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+    const result = await advisorService.updateDocumentStatus(req.user.id, req.params.id, status);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+};

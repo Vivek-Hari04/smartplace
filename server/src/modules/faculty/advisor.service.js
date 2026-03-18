@@ -1,6 +1,7 @@
-// modules/faculty/advisor.service.jslet accessToken;
+// modules/faculty/advisor.service.js
 
 const pool = require("../../config/db");
+const supabase = require('../../config/supabaseAdmin');
 
 exports.getMyStudents = async (advisorId) => {
   const result = await pool.query(
@@ -69,6 +70,53 @@ exports.rejectDocument = async (advisorId, documentId) => {
   );
 
   if (!result.rowCount) throw new Error("Unauthorized");
+
+  return result.rows[0];
+};
+
+exports.getPendingDocuments = async () => {
+  const result = await pool.query(`
+    SELECT sd.*, u.fname, u.lname
+    FROM student_documents sd
+    JOIN users u ON u.user_id = sd.student_id
+    WHERE sd.status = 'PENDING'
+  `);
+  return result.rows;
+};
+
+exports.viewDocument = async (documentId) => {
+  const result = await pool.query(
+    `SELECT file_url FROM student_documents WHERE document_id = $1`,
+    [documentId]
+  );
+
+  if (!result.rows.length) {
+    throw new Error('Document not found');
+  }
+
+  const { data, error } = await supabase.storage
+    .from('documents')
+    .createSignedUrl(result.rows[0].file_url, 300);
+
+  if (error) {
+    throw new Error('Failed to generate signed URL');
+  }
+
+  return data.signedUrl;
+};
+
+exports.updateDocumentStatus = async (advisorId, documentId, status) => {
+  const result = await pool.query(
+    `UPDATE student_documents
+     SET status = $1,
+         reviewed_by = $2,
+         reviewed_at = NOW()
+     WHERE document_id = $3
+     RETURNING *`,
+    [status, advisorId, documentId]
+  );
+
+  if (!result.rowCount) throw new Error("Document not found");
 
   return result.rows[0];
 };

@@ -20,6 +20,10 @@ export default function FacultyDashboard({
   const [isAdvisor, setIsAdvisor] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  const [advisorTab, setAdvisorTab] = useState("overview"); 
+  const [selectedStudentForDocs, setSelectedStudentForDocs] = useState("");
+  const [specificStudentDocs, setSpecificStudentDocs] = useState([]);
+
   // Form states
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [courseFormData, setCourseFormData] = useState({ name: "", description: "" });
@@ -105,22 +109,9 @@ useEffect(() => {
 
       const studentsRes = await api.get("/advisor/students");
       setAdvisorStudents(studentsRes.data);
-      const allDocs = [];
 
-      for (const student of studentsRes.data) {
-        const docsRes = await api.get(`/advisor/students/${student.user_id}/documents`);
-        const pending = docsRes.data.filter((doc) => doc.status === "PENDING");
-
-        allDocs.push(
-          ...pending.map((doc) => ({
-            ...doc,
-            fname: student.fname,
-            lname: student.lname
-          }))
-        );
-      }
-
-      setPendingDocs(allDocs);
+      const res = await api.get("/advisor/documents");
+      setPendingDocs(res.data);
     } catch (err) {
       console.error("Failed to load pending docs", err);
     } finally {
@@ -269,11 +260,36 @@ useEffect(() => {
 
   const handleVerifyDoc = async (docId, status) => {
     try {
-      const endpoint = status === "VERIFIED" ? "verify" : "reject";
-      await api.patch(`/advisor/documents/${docId}/${endpoint}`);
+      await api.put(`/advisor/documents/${docId}`, { status });
       setPendingDocs(pendingDocs.filter(d => d.document_id !== docId));
+      if (selectedStudentForDocs) {
+        loadSpecificStudentDocs(selectedStudentForDocs);
+      }
     } catch (err) {
       alert(`Failed to ${status.toLowerCase()} document`);
+    }
+  };
+
+  const loadSpecificStudentDocs = async (studentId) => {
+    try {
+      setLoading(true);
+      const res = await api.get(`/advisor/students/${studentId}/documents`);
+      setSpecificStudentDocs(res.data);
+    } catch(err) {
+      alert("Failed to load documents for student");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleViewDoc = async (docId) => {
+    try {
+      const res = await api.get(`/advisor/documents/${docId}/view`);
+      if (res.data && res.data.url) {
+        window.open(res.data.url, '_blank');
+      }
+    } catch (err) {
+      alert("Failed to view document");
     }
   };
 
@@ -719,24 +735,32 @@ const sendMessage = async () => {
               </span>
             </div>
             
-            {selectedDoubt.status !== "RESOLVED" && (
+            <div style={{ display: "flex", gap: "10px" }}>
+              {selectedDoubt.status !== "RESOLVED" && (
+                <button
+                  className="btn btn-success"
+                  onClick={async () => {
+                    try {
+                      await api.put(`/faculty/doubts/${selectedDoubt.doubt_id}/status`, { status: "RESOLVED" });
+                      setSelectedDoubt(prev => ({ ...prev, status: "RESOLVED" }));
+                      setDoubts(prev => prev.map(d => 
+                        d.doubt_id === selectedDoubt.doubt_id ? { ...d, status: "RESOLVED" } : d
+                      ));
+                    } catch (err) {
+                      alert("Failed to update status");
+                    }
+                  }}
+                >
+                  Mark as Resolved
+                </button>
+              )}
               <button
-                className="btn btn-success"
-                onClick={async () => {
-                  try {
-                    await api.put(`/faculty/doubts/${selectedDoubt.doubt_id}/status`, { status: "RESOLVED" });
-                    setSelectedDoubt(prev => ({ ...prev, status: "RESOLVED" }));
-                    setDoubts(prev => prev.map(d => 
-                      d.doubt_id === selectedDoubt.doubt_id ? { ...d, status: "RESOLVED" } : d
-                    ));
-                  } catch (err) {
-                    alert("Failed to update status");
-                  }
-                }}
+                className="btn btn-secondary"
+                onClick={() => setSelectedDoubt(null)}
               >
-                Mark as Resolved
+                Close ✕
               </button>
-            )}
+            </div>
           </div>
 
           {/* CHAT */}
@@ -811,77 +835,137 @@ const sendMessage = async () => {
       {/* ADVISOR PANEL */}
       {activeTab === "advisor" && isAdvisor && (
         <section className="content-card">
-           {/* ADVISOR STUDENTS */}
-            <section className="content-card" style={{ marginBottom: "2rem" }}>
-              <h3>My Students ({advisorStudents.length})</h3>
+          <div className="tab-header" style={{ marginBottom: '1rem' }}>
+            <button className={`btn ${advisorTab === 'overview' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setAdvisorTab('overview')}>Overview</button>
+            <button className={`btn ${advisorTab === 'student-docs' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setAdvisorTab('student-docs')}>Student Documents</button>
+          </div>
+
+          {advisorTab === 'overview' && (
+            <>
+              {/* ADVISOR STUDENTS */}
+              <section className="content-card" style={{ marginBottom: "2rem" }}>
+                <h3>My Students ({advisorStudents.length})</h3>
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Email</th>
+                        <th>Department</th>
+                        <th>Graduation Year</th>
+                        <th>CGPA</th>
+                        <th>Placement Eligible</th>
+                        <th>Verified</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {advisorStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan={8}>No students assigned.</td>
+                        </tr>
+                      ) : (
+                        advisorStudents.map((s) => (
+                          <tr key={s.user_id}>
+                             <td>{s.fname}</td>
+                            <td>{s.lname}</td>
+                            <td>{s.email}</td>
+                            <td>{s.department}</td>
+                            <td>{s.graduation_year}</td>
+                            <td>{s.cgpa}</td>
+                            <td>{s.placement_eligible ? "Yes" : "No"}</td>
+                            <td>{s.is_verified ? "Yes" : "No"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+                <h2>Advisor Dashboard</h2>
+              </div>
               <div className="table-responsive">
                 <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>First Name</th>
-                      <th>Last Name</th>
-                      <th>Email</th>
-                      <th>Department</th>
-                      <th>Graduation Year</th>
-                      <th>CGPA</th>
-                      <th>Placement Eligible</th>
-                      <th>Verified</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Student</th><th>Document</th><th>View</th><th>Status</th><th>Actions</th></tr></thead>
                   <tbody>
-                    {advisorStudents.length === 0 ? (
-                      <tr>
-                        <td colSpan={8}>No students assigned.</td>
-                      </tr>
-                    ) : (
-                      advisorStudents.map((s) => (
-                        <tr key={s.user_id}>
-                           <td>{s.fname}</td>
-                          <td>{s.lname}</td>
-                          <td>{s.email}</td>
-                          <td>{s.department}</td>
-                          <td>{s.graduation_year}</td>
-                          <td>{s.cgpa}</td>
-                          <td>{s.placement_eligible ? "Yes" : "No"}</td>
-                          <td>{s.is_verified ? "Yes" : "No"}</td>
-                         
+                    {pendingDocs.length === 0 ? <tr><td colSpan={5}>No pending documents.</td></tr> :
+                      pendingDocs.map(doc => (
+                        <tr key={doc.document_id}>
+                          <td>{doc.fname} {doc.lname}</td>
+                          <td>{doc.document_type} - {doc.file_name}</td>
+                          <td>
+                            <button className="btn btn-secondary" onClick={() => handleViewDoc(doc.document_id)}>View</button>
+                          </td>
+                          <td><span className="status-badge pending">{doc.status}</span></td>
+                          <td className="action-buttons">
+                            <button className="btn btn-primary" onClick={() => handleVerifyDoc(doc.document_id, "VERIFIED")}>Approve</button>
+                            <button className="btn btn-danger" onClick={() => handleVerifyDoc(doc.document_id, "REJECTED")}>Reject</button>
+                          </td>
                         </tr>
-                      ))
-                    )}
+                      ))}
                   </tbody>
                 </table>
               </div>
-            </section>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-          <h2>Advisor Dashboard</h2>
-          <div style={{ display: "flex", gap: "1rem" }}>
-            <button className="btn btn-primary" onClick={() => {
-              setLoading(true);
-              // fetchPendingDocuments is logic from useEffect, we just call it indirectly or replicate here
-            }}>
-              Refresh Documents
-            </button>
-          </div>
-        </div>
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead><tr><th>Student</th><th>Document</th><th>Status</th><th>Actions</th></tr></thead>
-              <tbody>
-                {pendingDocs.length === 0 ? <tr><td colSpan={4}>No pending documents.</td></tr> :
-                  pendingDocs.map(doc => (
-                    <tr key={doc.document_id}>
-                      <td>{doc.fname} {doc.lname}</td>
-                      <td><a href={doc.file_url} target="_blank" rel="noreferrer">{doc.document_type}</a></td>
-                      <td><span className="status-badge pending">{doc.status}</span></td>
-                      <td className="action-buttons">
-                        <button className="btn btn-primary" onClick={() => handleVerifyDoc(doc.document_id, "VERIFIED")}>Verify</button>
-                        <button className="btn btn-danger" onClick={() => handleVerifyDoc(doc.document_id, "REJECTED")}>Reject</button>
-                      </td>
-                    </tr>
+            </>
+          )}
+
+          {advisorTab === 'student-docs' && (
+            <div className="student-docs-container">
+              <h3>View Student Documents</h3>
+              <div style={{ marginBottom: "1rem" }}>
+                <select 
+                  className="form-select" 
+                  value={selectedStudentForDocs}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setSelectedStudentForDocs(newId);
+                    if (newId) loadSpecificStudentDocs(newId);
+                    else setSpecificStudentDocs([]);
+                  }}
+                  style={{ maxWidth: "300px" }}
+                >
+                  <option value="">-- Select a Student --</option>
+                  {advisorStudents.map(s => (
+                    <option key={s.user_id} value={s.user_id}>{s.fname} {s.lname}</option>
                   ))}
-              </tbody>
-            </table>
-          </div>
+                </select>
+              </div>
+
+              {selectedStudentForDocs && (
+                <div className="table-responsive">
+                  <table className="data-table">
+                    <thead><tr><th>Document</th><th>View</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {specificStudentDocs.length === 0 ? <tr><td colSpan={4}>No documents uploaded yet.</td></tr> :
+                        specificStudentDocs.map(doc => (
+                          <tr key={doc.document_id}>
+                            <td>{doc.document_type} - {doc.file_name}</td>
+                            <td>
+                              <button className="btn btn-secondary" onClick={() => handleViewDoc(doc.document_id)}>View</button>
+                            </td>
+                            <td>
+                              <span style={{ 
+                                color: doc.status === 'VERIFIED' ? '#16a34a' : doc.status === 'REJECTED' ? '#dc2626' : '#f59e0b', 
+                                fontWeight: 'bold' 
+                              }}>
+                                {doc.status}
+                              </span>
+                            </td>
+                            <td className="action-buttons">
+                              {doc.status !== 'VERIFIED' && <button className="btn btn-primary" onClick={() => handleVerifyDoc(doc.document_id, "VERIFIED")}>Approve</button>}
+                              {doc.status !== 'REJECTED' && <button className="btn btn-danger" onClick={() => handleVerifyDoc(doc.document_id, "REJECTED")}>Reject</button>}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
         </section>
       )}
     </DashboardLayout>

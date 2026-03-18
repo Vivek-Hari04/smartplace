@@ -26,4 +26,9 @@ router.patch("/documents/:id/verify", advisorController.verifyDocument);
 // Reject document
 router.patch("/documents/:id/reject", advisorController.rejectDocument);
 
+// New Document Features
+router.get("/documents", advisorController.getPendingDocuments);
+router.get("/documents/:id/view", advisorController.viewDocument);
+router.put("/documents/:id", advisorController.updateDocumentStatus);
+
 module.exports = router;

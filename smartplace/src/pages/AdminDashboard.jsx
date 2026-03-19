@@ -61,6 +61,10 @@ export default function AdminDashboard({ user, accessToken }) {
   const [registrants, setRegistrants] = useState([]);
   const [selectedDrive, setSelectedDrive] = useState(null);
 
+  const [studentTab, setStudentTab] = useState('pending-students');
+  const [placementTab, setPlacementTab] = useState('all-drives');
+  const [userDirectoryTab, setUserDirectoryTab] = useState('all-users');
+
   // Modal/Form State
   const [showAdvisorModal, setShowAdvisorModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -99,7 +103,7 @@ export default function AdminDashboard({ user, accessToken }) {
       if (tab === 'overview') {
         const res = await api.get('/admin/stats');
         setStats(res.data);
-      } else if (tab === 'students') {
+      } else if (tab === 'pending-students') {
         const res = await api.get('/admin/students/pending');
         setPendingStudents(res.data);
       } else if (tab === 'pending-users') {
@@ -111,13 +115,19 @@ export default function AdminDashboard({ user, accessToken }) {
       } else if (tab === 'courses') {
         const res = await api.get('/admin/courses');
         setCourses(res.data);
-      } else if (tab === 'users') {
+      } else if (tab === 'all-users' || tab === 'dir-students' || tab === 'companies' || tab === 'alumni') {
         const res = await api.get('/admin/users');
         setAllUsers(res.data);
       } else if (tab === 'all-drives') {
         const res = await api.get('/admin/drives');
         console.log('All Drives API Response:', res.data);
         setAllDrives(res.data);
+      } else if (tab === 'students') {
+        fetchData(studentTab);
+      } else if (tab === 'placements') {
+        fetchData(placementTab);
+      } else if (tab === 'user-directory') {
+        fetchData(userDirectoryTab);
       }
     } catch (err) {
       console.error(`Error fetching ${tab}:`, err);
@@ -144,7 +154,12 @@ export default function AdminDashboard({ user, accessToken }) {
 
     fetchData(activeTab);
 
-    if (activeTab === "filter-students" || activeTab === "placed-students") {
+    if (
+      (activeTab === "students" && studentTab === "filter-students") ||
+      (activeTab === "placements" && placementTab === "placed-students") ||
+      activeTab === "filter-students" ||
+      activeTab === "placed-students"
+    ) {
       fetchDepartments();
     }
 
@@ -390,13 +405,10 @@ export default function AdminDashboard({ user, accessToken }) {
   const sidebarItems = [
     { id: 'overview', label: 'Overview' },
     { id: 'pending-users', label: 'Approve Registrations' },
-    { id: 'students', label: 'Pending Students' },
-    { id: 'filter-students', label: 'Student Filter' },
-    { id: 'placed-students', label: 'Placed Students' },
-    { id: 'all-drives', label: 'All Drives' },
-    { id: 'faculty', label: 'Faculty List' },
+    { id: 'students', label: 'Students' },
+    { id: 'placements', label: 'Placements' },
     { id: 'courses', label: 'All Courses' },
-    { id: 'users', label: 'User Directory' },
+    { id: 'user-directory', label: 'User Directory' },
   ];
 
   const filteredDrives = useMemo(() => {
@@ -606,13 +618,11 @@ export default function AdminDashboard({ user, accessToken }) {
       <div className="modern-table-card">
         <div className="table-header-area">
           <h2 style={{ margin: 0, fontSize: '1.25rem' }}>
-            {activeTab === 'students' ? 'Verification Queue' : 
+            {activeTab === 'students' ? 'Students Management' :
+             activeTab === 'placements' ? 'Placements Management' :
+             activeTab === 'user-directory' ? 'User Directory' :
              activeTab === 'pending-users' ? 'Pending Registrations' :
-             activeTab === 'filter-students' ? 'Student Filter' : 
-             activeTab === 'all-drives' ? 'All Placement Drives' :
-             activeTab === 'faculty' ? 'Faculty Directory' :
-             activeTab === 'courses' ? 'Academic Courses' :
-             activeTab === 'users' ? 'User Directory' : 'System Activity'}
+             activeTab === 'courses' ? 'Academic Courses' : 'System Activity'}
           </h2>
           {activeTab !== 'overview' && (
             <button className="btn btn-secondary" onClick={() => fetchData(activeTab)}>
@@ -662,6 +672,13 @@ export default function AdminDashboard({ user, accessToken }) {
           )}
 
           {activeTab === 'students' && (
+            <div className="tab-header" style={{ display: 'flex', gap: '1rem', padding: '1.5rem 1.5rem 0' }}>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${studentTab === 'pending-students' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setStudentTab("pending-students"); fetchData("pending-students"); }}>Pending Students</button>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${studentTab === 'filter-students' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setStudentTab("filter-students"); fetchData("filter-students"); fetchDepartments(); }}>Student Filter</button>
+            </div>
+          )}
+
+          {activeTab === 'students' && studentTab === 'pending-students' && (
             <table className="data-table">
               <thead>
                 <tr>
@@ -701,7 +718,14 @@ export default function AdminDashboard({ user, accessToken }) {
             </table>
           )}
 
-          {activeTab === 'all-drives' && (
+          {activeTab === 'placements' && (
+            <div className="tab-header" style={{ display: 'flex', gap: '1rem', padding: '1.5rem 1.5rem 0' }}>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${placementTab === 'all-drives' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacementTab("all-drives"); fetchData("all-drives"); }}>All Drives</button>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${placementTab === 'placed-students' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacementTab("placed-students"); fetchData("placed-students"); fetchDepartments(); }}>Placed Students</button>
+            </div>
+          )}
+
+          {activeTab === 'placements' && placementTab === 'all-drives' && (
             <div style={{ padding: '1.5rem' }}>
               {!selectedDrive ? (
                 <>
@@ -910,7 +934,17 @@ export default function AdminDashboard({ user, accessToken }) {
             </div>
           )}
 
-          {activeTab === 'faculty' && (
+          {activeTab === 'user-directory' && (
+            <div className="tab-header" style={{ display: 'flex', gap: '1rem', padding: '1.5rem 1.5rem 0' }}>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${userDirectoryTab === 'all-users' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setUserDirectoryTab("all-users"); fetchData("all-users"); }}>All Users</button>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${userDirectoryTab === 'dir-students' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setUserDirectoryTab("dir-students"); fetchData("dir-students"); }}>Students</button>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${userDirectoryTab === 'faculty' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setUserDirectoryTab("faculty"); fetchData("faculty"); }}>Faculty</button>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${userDirectoryTab === 'companies' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setUserDirectoryTab("companies"); fetchData("companies"); }}>Companies</button>
+              <button style={{ padding: '0.5rem 1rem' }} className={`btn ${userDirectoryTab === 'alumni' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setUserDirectoryTab("alumni"); fetchData("alumni"); }}>Alumni</button>
+            </div>
+          )}
+
+          {activeTab === 'user-directory' && userDirectoryTab === 'faculty' && (
             <table className="data-table">
               <thead>
                 <tr>
@@ -964,7 +998,7 @@ export default function AdminDashboard({ user, accessToken }) {
             </table>
           )}
 
-          {activeTab === 'users' && (
+          {activeTab === 'user-directory' && userDirectoryTab === 'all-users' && (
             <table className="data-table">
               <thead>
                 <tr>
@@ -1006,8 +1040,51 @@ export default function AdminDashboard({ user, accessToken }) {
               </tbody>
             </table>
           )}
+
+          {activeTab === 'user-directory' && (userDirectoryTab === 'dir-students' || userDirectoryTab === 'companies' || userDirectoryTab === 'alumni') && (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Identity</th>
+                  <th>Role</th>
+                  <th>Registration Date</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {allUsers.filter(u => u.role === (userDirectoryTab === 'companies' ? 'company' : userDirectoryTab === 'alumni' ? 'alumni' : 'student')).map(u => (
+                  <tr key={u.user_id}>
+                    <td>
+                      <div className="user-identity-cell">
+                        <div className="user-avatar-circle">{u.fname[0]}{(u.lname && u.lname[0]) || ''}</div>
+                        <div className="user-info-stack">
+                          <span className="user-name-text">{u.fname} {u.lname}</span>
+                          <span className="user-email-sub">{u.email}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="badge-pill" style={{background: 'rgba(139, 92, 246, 0.1)', color: '#8b5cf6'}}>
+                        {u.role.toUpperCase()}
+                      </span>
+                    </td>
+                    <td><span className="user-id-text">{new Date(u.created_at).toLocaleDateString(undefined, { dateStyle: 'long' })}</span></td>
+                    <td>
+                      {u.is_verified ? (
+                         <span className="badge-pill" style={{background: 'rgba(16, 185, 129, 0.1)', color: '#10b981'}}>VERIFIED</span>
+                      ) : (
+                         <span className="badge-pill" style={{background: u.rejection_reason ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)', color: u.rejection_reason ? '#ef4444' : '#f59e0b'}}>
+                           {u.rejection_reason ? 'REJECTED' : 'PENDING'}
+                         </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
           
-          {activeTab === 'filter-students' && (
+          {activeTab === 'students' && studentTab === 'filter-students' && (
             <div style={{ padding: '1.5rem' }}>
               
               <div style={{ marginBottom: '1.5rem' }}>
@@ -1133,7 +1210,7 @@ export default function AdminDashboard({ user, accessToken }) {
             </div>
           )}
 
-          {activeTab === 'placed-students' && (
+          {activeTab === 'placements' && placementTab === 'placed-students' && (
             <div style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
                 <div>

@@ -22,8 +22,10 @@ export default function StudentDashboard({
   const [driveEligibilityList, setDriveEligibilityList] = useState([]);
   const [driveStatus, setDriveStatus] = useState([]);
   const [myOffers, setMyOffers] = useState([]);
+  const [documents, setDocuments] = useState([]);
 
   const [courseTab, setCourseTab] = useState("enrolled");
+  const [placementTab, setPlacementTab] = useState("eligible-drives");
   const [isMaterialsModalOpen, setIsMaterialsModalOpen] = useState(false);
   const [currentMaterials, setCurrentMaterials] = useState([]);
 
@@ -41,6 +43,10 @@ export default function StudentDashboard({
   const [chatMessages, setChatMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const chatEndRef = useRef(null);
+
+  const [uploadDocType, setUploadDocType] = useState("");
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "auto" });
@@ -107,6 +113,11 @@ export default function StudentDashboard({
       } else if (tab === "my-offers") {
         const res = await api.get("/offers/applications");
         setMyOffers(res.data);
+      } else if (tab === "placements-offers") {
+        fetchData(placementTab);
+      } else if (tab === "documents") {
+        const res = await api.get("/documents");
+        setDocuments(res.data);
       }
     } catch (err) {
       setError(handleError(err));
@@ -154,10 +165,7 @@ const sendMessage = async () => {
     { id: "courses", label: "Courses" },
     { id: "assessments", label: "Assessments" },
     // { id: "slots", label: "Placement Slots" },
-    { id: "eligible-drives", label: "Eligible Drives" },
-    { id: "drive-eligibility", label: "Drive Eligibility" },
-    { id: "drive-results", label: "Drive Results" },
-    { id: "my-offers", label: "My Offers" },
+    { id: "placements-offers", label: "Placements & Offers" },
     { id: "alumni", label: "Doubt Clearance" },
     { id: "network", label: "Alumni Network" },
     { id: "documents", label: "Documents" }
@@ -585,6 +593,12 @@ const sendMessage = async () => {
                       Delete
                     </button>
                   )}
+                  <button
+                    className="btn btn-secondary"
+                    onClick={() => setSelectedDoubt(null)}
+                  >
+                    Close ✕
+                  </button>
                 </div>
               </div>
 
@@ -703,7 +717,6 @@ const sendMessage = async () => {
     <section className="content-card">
       <div className="tab-header">
         <button className="btn btn-primary" onClick={() => fetchData("assessments")}>Upcoming Tests</button>
-        <button className="btn btn-secondary" onClick={() => api.get("/assessments/history").then(res => setAssessments(res.data))}>History</button>
       </div>
 
       <div className="table-responsive">
@@ -1152,31 +1165,127 @@ const sendMessage = async () => {
     </section>
   );
 
+  const renderPlacementsOffers = () => (
+    <div className="placements-offers-container">
+      <div className="tab-header" style={{ marginBottom: '1rem' }}>
+        <button className={`btn ${placementTab === 'eligible-drives' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacementTab("eligible-drives"); fetchData("eligible-drives"); }}>Eligible Drives</button>
+        <button className={`btn ${placementTab === 'drive-eligibility' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacementTab("drive-eligibility"); fetchData("drive-eligibility"); }}>Drive Eligibility</button>
+        <button className={`btn ${placementTab === 'drive-results' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacementTab("drive-results"); fetchData("drive-results"); }}>Drive Results</button>
+        <button className={`btn ${placementTab === 'my-offers' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setPlacementTab("my-offers"); fetchData("my-offers"); }}>My Offers</button>
+      </div>
+      {placementTab === "eligible-drives" && renderEligibleDrives()}
+      {placementTab === "drive-eligibility" && renderDriveEligibility()}
+      {placementTab === "drive-results" && renderDriveStatus()}
+      {placementTab === "my-offers" && renderMyOffers()}
+    </div>
+  );
+
+  const handleDocumentUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadFile || !uploadDocType) return;
+    
+    setUploadingDoc(true);
+    try {
+      const formData = new FormData();
+      formData.append("document", uploadFile);
+      formData.append("document_type", uploadDocType);
+      
+      await api.post("/documents", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      
+      setUploadFile(null);
+      setUploadDocType("");
+      fetchData("documents");
+      alert("Document uploaded successfully");
+    } catch (err) {
+      alert(handleError(err));
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleViewDoc = async (docId) => {
+    try {
+      const res = await api.get(`/documents/${docId}/view`);
+      if (res.data && res.data.url) {
+        window.open(res.data.url, '_blank');
+      }
+    } catch (err) {
+      alert("Failed to view document");
+    }
+  };
+
   const renderDocuments = () => (
     <section className="content-card">
       <h3>Document Management</h3>
       <p className="page-subtitle">Upload and manage your resumes and transcripts</p>
 
-      <div className="document-list">
-        <div className="doc-item">
-          <div className="doc-info">
-            <span className="doc-name">Main_Resume_2024.pdf</span>
-            <span className="doc-meta">Uploaded on Jan 20, 2024</span>
-          </div>
-          <div className="action-buttons">
-            <button className="btn btn-secondary">View</button>
-            <button className="btn btn-danger">Delete</button>
-          </div>
-        </div>
-      </div>
+      <form onSubmit={handleDocumentUpload} style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <input 
+          type="file" 
+          onChange={(e) => setUploadFile(e.target.files[0])} 
+          required 
+          className="form-control" 
+          style={{ flex: 1, minWidth: '200px' }} 
+        />
+        <select 
+          value={uploadDocType} 
+          onChange={(e) => setUploadDocType(e.target.value)} 
+          required 
+          className="form-select" 
+          style={{ width: '200px' }}
+        >
+          <option value="" disabled>Select Document Type</option>
+          <option value="Resume">Resume</option>
+          <option value="Transcript">Transcript</option>
+          <option value="Cover Letter">Cover Letter</option>
+          <option value="Other">Other</option>
+        </select>
+        <button type="submit" className="btn btn-primary" disabled={uploadingDoc}>
+          {uploadingDoc ? 'Uploading...' : 'Upload'}
+        </button>
+      </form>
 
-      <div className="upload-section">
-        <label className="upload-label">
-          <span>Upload New Document</span>
-          <input type="file" className="hidden-input" />
-          <button className="btn btn-primary">Choose File</button>
-        </label>
-        <p className="help-text">Accepted formats: PDF, DOCX (Max 2MB)</p>
+      <div className="table-responsive">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Document Type</th>
+              <th>File Name</th>
+              <th>View</th>
+              <th>Status</th>
+              <th>Uploaded At</th>
+            </tr>
+          </thead>
+          <tbody>
+            {documents.length === 0 ? (
+              <tr>
+                <td colSpan="4" style={{ textAlign: "center", color: "#6b7280", padding: "2rem" }}>No documents found</td>
+              </tr>
+            ) : (
+              documents.map((doc, idx) => (
+                <tr key={idx}>
+                  <td><strong>{doc.document_type}</strong></td>
+                  <td>{doc.file_name}</td>
+                  <td>
+                    <button className="btn btn-secondary btn-sm" onClick={() => handleViewDoc(doc.document_id)}>View</button>
+                  </td>
+                  <td>
+                    {doc.status === 'VERIFIED' ? (
+                      <span style={{ color: '#16a34a', fontWeight: 'bold' }}>VERIFIED</span>
+                    ) : doc.status === 'REJECTED' ? (
+                      <span style={{ color: '#dc2626', fontWeight: 'bold' }}>REJECTED</span>
+                    ) : (
+                      <span style={{ color: '#f59e0b', fontWeight: 'bold' }}>PENDING</span>
+                    )}
+                  </td>
+                  <td>{new Date(doc.created_at).toLocaleDateString()}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </section>
   );
@@ -1367,10 +1476,7 @@ const sendMessage = async () => {
         {activeTab === "courses" && renderCourses()}
         {activeTab === "assessments" && renderAssessments()}
         {activeTab === "slots" && renderSlots()}
-        {activeTab === "eligible-drives" && renderEligibleDrives()}
-        {activeTab === "drive-eligibility" && renderDriveEligibility()}
-        {activeTab === "drive-results" && renderDriveStatus()}
-        {activeTab === "my-offers" && renderMyOffers()}
+        {activeTab === "placements-offers" && renderPlacementsOffers()}
         {activeTab === "alumni" && <PlacementGuidance accessToken={accessToken} userRole="student" currentUser={user} />}
         {activeTab === "network" && <AlumniNetwork accessToken={accessToken} />}
         {activeTab === "documents" && renderDocuments()}

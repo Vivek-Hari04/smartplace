@@ -1,53 +1,237 @@
-# SmartPlace
+# 🚀 SmartPlace — Placement Management System
 
-## Project Overview
-SmartPlace is an innovative solution designed to enhance the living experience through intelligent management of home environments. By integrating various smart devices, users can control their home efficiently and intuitively.
+SmartPlace is a full-stack web application designed to streamline the campus placement process by connecting students, faculty, advisors, and administrators on a single platform.
 
-## Features
-- **Device Control**: Remotely manage lighting, heating, and other appliances.
-- **Automated Scheduling**: Set schedules for devices according to user preferences.
-- **Energy Monitoring**: Track energy consumption to encourage efficiency.
-- **Remote Access**: Control your home environment from anywhere using a mobile app.
+It provides structured workflows for managing placement drives, applications, offers, academic resources, and real-time system interactions.
 
-## Tech Stack
-- **Frontend**: React, Redux
-- **Backend**: Node.js, Express
-- **Database**: MongoDB
-- **Integration**: RESTful APIs for seamless functionality across devices.
-- **Deployment**: Docker for containerization, hosted on AWS.
+---
 
-## Installation Instructions
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Sabari-Vijayan/smartplace.git
-   ```
-2. Navigate to the project directory:
-   ```bash
-   cd smartplace
-   ```
-3. Install the backend dependencies:
-   ```bash
-   npm install
-   ```
-4. Set up the database and environment variables as instructed in the `env.example` file.
-5. Start the application:
-   ```bash
-   npm start
-   ```
+## 🌐 Overview
 
-## API Documentation
-- **GET /api/devices**: Retrieve the list of smart devices.
-- **POST /api/devices**: Add a new smart device.
-- **PUT /api/devices/:id**: Update device information based on its ID.
-- **DELETE /api/devices/:id**: Remove a device from the system.
+SmartPlace digitizes and automates the entire placement lifecycle:
 
-Refer to the [API documentation](https://example.com/api-docs) for more details on endpoints and their usage.
+* Students can explore and apply for drives
+* Companies can post offers
+* Faculty can manage course materials
+* Advisors can monitor student progress
+* Admins control and oversee the system
+* Users receive  notifications for critical updates
 
-## Contribution Guidelines
-1. Fork the repository.
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
-5. Open a Pull Request. 
+---
 
-Thank you for contributing to SmartPlace!
+## 🧠 Tech Stack
+
+### Frontend
+
+* React.js
+* Vite
+* Axios
+
+### Backend
+
+* Node.js
+* Express.js
+
+### Database
+
+* PostgreSQL (Supabase)
+
+### Authentication
+
+* JWT-based authentication
+* Role-based access control (RBAC)
+
+### Realtime System
+
+* Event-driven notifications
+
+---
+
+## 🏗️ Architecture
+
+The backend follows a modular and scalable structure:
+
+modules/
+├── admin/
+├── advisor/
+├── faculty/
+├── student/
+middleware/
+config/
+routes/
+controllers/
+services/
+
+### Flow
+
+Route → Controller → Service → Database
+
+* Routes → define endpoints
+* Controllers → handle request/response
+* Services → business logic
+* Database → query execution
+
+---
+
+## 🔑 Core Features
+
+### 🎓 Student
+
+* View eligible placement drives
+* Apply for offers
+* Track application status
+* Accept or reject offers
+* Receive real-time updates on application status
+
+### 🏢 Company / Placement
+
+* Create placement drives
+* Add job offers
+* Manage applicants
+* Notify students instantly
+
+### 👨‍🏫 Faculty
+
+* Upload course materials (Drive links)
+* Manage academic content
+* Notify students about new materials
+
+### 🧑‍💼 Advisor
+
+* Monitor student performance
+* Track placement activity
+* Receive alerts for important events
+
+### 🛠️ Admin
+
+* Manage users and roles
+* System-level control
+* Broadcast system-wide notifications
+
+---
+
+## 🔔 Real-Time Notification System
+
+SmartPlace includes a notification system to ensure users stay updated.
+
+### Features:
+
+* updates on:
+
+  * Application status changes
+  * New placement drives
+  * Offer acceptance/rejection
+  * Course material uploads
+* Role-specific notifications
+
+---
+
+## 📦 Key Functionalities
+
+### Placement Drive Management
+
+* Drives contain multiple offers
+* Offers linked to companies
+* Structured relational design
+
+### Offer Application System
+
+* Applications per offer
+* Acceptance locks further actions
+* Data integrity enforced
+
+### Material Upload (Drive-based)
+
+* No file storage dependency
+* Uses external links
+* Lightweight and scalable
+
+### Role-Based Access Control
+
+* Strict permission handling
+* Secure route protection
+
+---
+
+## 🔐 Security
+
+* JWT authentication
+* Middleware authorization
+* Ownership validation
+* Parameterized SQL queries
+
+---
+
+## 🗄️ Database Design
+
+* Strong relational schema
+* Foreign key constraints
+* Cascading deletes
+
+Example flow:
+placement_drives → placement_offers → offer_applications
+
+---
+
+## ⚙️ Setup
+
+### Clone Repo
+
+git clone 
+cd smartplace
+
+### Install Dependencies
+
+npm install
+
+### Environment Variables (.env)
+
+PORT=5000
+DATABASE_URL=your_postgres_url
+JWT_SECRET=your_secret
+
+### Run Backend
+
+cd server
+
+npm run dev
+
+### Run Frontend
+
+cd smartplace
+
+npm install
+
+npm run dev
+
+---
+
+## 🔌 API Example
+
+### Upload Material
+
+POST /courses//materials
+
+Request Body:
+
+{
+"title": "Week 1 Notes",
+"description": "Introduction lecture",
+"file_url": "https://drive.google.com/..."
+}
+
+---
+
+## 📈 Future Improvements
+
+* Push notifications (mobile)
+* AI-based recommendations
+* Resume analysis
+* Interview scheduling
+* Notification preference settings
+
+---
+
+## 🤝 Contribution
+
+Fork the repo and submit pull requests.
